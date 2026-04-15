@@ -1,0 +1,6 @@
+.venv312/
+__pycache__/
+*.pyc
+household_power.db
+uvicorn.stdout.log
+uvicorn.stderr.log
