@@ -4,3 +4,5 @@ __pycache__/
 household_power.db
 uvicorn.stdout.log
 uvicorn.stderr.log
+frontend/node_modules/
+frontend/dist/

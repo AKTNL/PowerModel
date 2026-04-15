@@ -1,0 +1,27 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+const apiProxyTarget = "http://127.0.0.1:8000";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      "/users": apiProxyTarget,
+      "/usage": apiProxyTarget,
+      "/predict": apiProxyTarget,
+      "/advice": apiProxyTarget,
+      "/chat": apiProxyTarget,
+      "/scenario": apiProxyTarget,
+      "/llm": apiProxyTarget,
+      "/health": apiProxyTarget,
+      "/docs": apiProxyTarget
+    }
+  },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true
+  }
+});
+
