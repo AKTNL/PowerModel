@@ -17,6 +17,7 @@ import {
   normalizeValue,
   parseCsvText
 } from "./lib/powerUtils.js";
+import ChatHistoryView from "./views/ChatHistoryView.jsx";
 import ChatView from "./views/ChatView.jsx";
 import ModelConfigView from "./views/ModelConfigView.jsx";
 import OverviewView from "./views/OverviewView.jsx";
@@ -132,11 +133,11 @@ function buildPredictionViewModel(prediction, meta, renderableRecords) {
       ? ` (${formatNumber((delta / Number(latest.power_kwh)) * 100)}%)`
       : "";
 
-  let note = "预测结果已经生成，可继续查看原因分析与节能建议。";
+  let note = "预测结果已经生成，可以继续查看原因分析与节能建议。";
   if (meta?.llm_error) {
-    note = "大模型调用失败，系统已自动回退到规则版解释与建议。";
+    note = "大模型解释失败，当前结果已回退到规则版文案。";
   } else if (meta?.generation_mode === "llm") {
-    note = "本次解释和建议由用户配置的大模型生成。";
+    note = "当前解释和建议由用户配置的大模型生成。";
   } else if (meta?.generation_mode) {
     note = `当前结果的生成模式为 ${meta.generation_mode}。`;
   }
@@ -213,6 +214,9 @@ export default function App() {
   const [llmPreview, setLlmPreview] = useState(DEFAULT_LLM_PREVIEW);
   const [chatHistory, setChatHistory] = useState([]);
   const [chatQuestion, setChatQuestion] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [pendingChatQuestion, setPendingChatQuestion] = useState("");
   const [scenarioForm, setScenarioForm] = useState(DEFAULT_SCENARIO_FORM);
   const [scenarioResult, setScenarioResult] = useState(DEFAULT_SCENARIO_RESULT);
   const [toast, setToast] = useState({ visible: false, tone: "info", message: "" });
@@ -237,6 +241,7 @@ export default function App() {
   const draftStatus = `草稿 ${usageDraft.length} 行，${usageAnalysis.validRecords.length} 行有效${
     usageAnalysis.partialCount ? `，${usageAnalysis.partialCount} 行待补全` : ""
   }`;
+  const latestChat = chatHistory.at(-1) || null;
 
   function showToast(message, tone = "info") {
     setToast({ visible: true, tone, message });
@@ -270,6 +275,9 @@ export default function App() {
     setLlmPreview(DEFAULT_LLM_PREVIEW);
     setChatHistory([]);
     setChatQuestion("");
+    setChatError("");
+    setIsChatLoading(false);
+    setPendingChatQuestion("");
     setScenarioForm(DEFAULT_SCENARIO_FORM);
     setScenarioResult(DEFAULT_SCENARIO_RESULT);
     setTargetMonth("");
@@ -402,10 +410,12 @@ export default function App() {
               llm_error: null
             }))
           );
+          setChatError("");
         }
       } catch {
         if (!cancelled) {
           setChatHistory([]);
+          setChatError("");
         }
       }
     }
@@ -527,6 +537,7 @@ export default function App() {
       tone: "success",
       text: `已保存配置：${config.model_name} @ ${config.base_url}`
     });
+    setChatError("");
     showToast("模型配置已保存");
   }
 
@@ -539,6 +550,7 @@ export default function App() {
       tone: "muted",
       text: "已清除当前用户的模型配置。"
     });
+    setChatError("");
     showToast("模型配置已清除");
   }
 
@@ -685,30 +697,42 @@ export default function App() {
     const question = normalizeValue(questionOverride ?? chatQuestion);
 
     if (!question) {
-      throw new Error("请输入你的问题。");
+      throw new Error("请先输入你的问题。");
     }
 
-    const response = await requestJson("/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        user_id: numericUserId,
-        question
-      })
-    });
+    if (!llmConfig?.enabled) {
+      throw new Error("请先在“模型设置”中配置并启用大模型，再使用智能问答。");
+    }
 
-    setChatHistory((current) => [
-      ...current,
-      {
-        ...response.data.chat,
-        generation_mode: response.data.generation_mode,
-        llm_error: response.data.llm_error
-      }
-    ]);
-    setChatQuestion("");
+    setChatError("");
+    setPendingChatQuestion(question);
+    setIsChatLoading(true);
     navigate("chat");
 
-    if (response.data.llm_error) {
-      showToast("模型问答失败，已自动回退到规则回答。", "error");
+    try {
+      const response = await requestJson("/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: numericUserId,
+          question
+        })
+      });
+
+      setChatHistory((current) => [
+        ...current,
+        {
+          ...response.data.chat,
+          generation_mode: response.data.generation_mode,
+          llm_error: response.data.llm_error
+        }
+      ]);
+      setChatQuestion("");
+    } catch (error) {
+      setChatError(error.message || "大模型问答失败，请稍后重试。");
+      throw error;
+    } finally {
+      setIsChatLoading(false);
+      setPendingChatQuestion("");
     }
   }
 
@@ -744,7 +768,13 @@ export default function App() {
 
         <div className="view-stack">
           {currentView === "overview" ? (
-            <OverviewView overview={overview} onNavigate={navigate} />
+            <OverviewView
+              overview={overview}
+              records={renderableRecords}
+              prediction={latestPrediction}
+              llmConfig={llmConfig}
+              onNavigate={navigate}
+            />
           ) : null}
 
           {currentView === "profile" ? (
@@ -824,10 +854,22 @@ export default function App() {
               }}
               onSend={() => runSafely(handleSendChat)}
               onQuickQuestion={(question) => runSafely(() => handleSendChat(question))}
-              chatHistory={chatHistory}
+              onOpenHistory={() => navigate("history")}
+              latestChat={latestChat}
+              historyCount={chatHistory.length}
+              llmEnabled={Boolean(llmConfig?.enabled)}
+              isChatLoading={isChatLoading}
+              pendingQuestion={pendingChatQuestion}
+              chatError={chatError}
             />
           ) : null}
 
+          {currentView === "history" ? (
+            <ChatHistoryView
+              chatHistory={chatHistory}
+              onBackToChat={() => navigate("chat")}
+            />
+          ) : null}
         </div>
       </main>
 

@@ -20,7 +20,7 @@ export default function Topbar({
         </div>
         <div className="topbar-meta">
           <span className="topbar-chip">LLM</span>
-          <strong>{llmConfig?.enabled ? llmConfig.model_name : "Rules"}</strong>
+          <strong>{llmConfig?.enabled ? llmConfig.model_name : "未配置"}</strong>
         </div>
         <div className="topbar-meta">
           <span className="topbar-chip">Prediction</span>

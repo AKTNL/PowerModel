@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ChatRecord, LLMConfig, MonthlyUsage, PredictionRecord, UserProfile
 from app.schemas import APIResponse, ChatRead, ChatRequest, ScenarioRequest
-from app.services.advisor import answer_question, simulate_scenario
+from app.services.advisor import ChatLLMUnavailableError, answer_question, simulate_scenario
 
 
 router = APIRouter(tags=["chat", "scenario"])
@@ -42,14 +42,18 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> APIResponse:
     ).all()
     recent_chats = list(reversed(recent_chats))
 
-    answer, answer_mode, llm_error = answer_question(
-        user,
-        prediction,
-        payload.question,
-        llm_config,
-        recent_usage=recent_usage,
-        recent_chats=recent_chats,
-    )
+    try:
+        answer, answer_mode, llm_error = answer_question(
+            user,
+            prediction,
+            payload.question,
+            llm_config,
+            recent_usage=recent_usage,
+            recent_chats=recent_chats,
+        )
+    except ChatLLMUnavailableError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     chat_record = ChatRecord(user_id=payload.user_id, question=payload.question, answer=answer)
     db.add(chat_record)
     db.commit()

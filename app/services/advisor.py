@@ -14,6 +14,10 @@ class InsightResult:
     llm_error: str | None = None
 
 
+class ChatLLMUnavailableError(Exception):
+    pass
+
+
 def _to_runtime_config(config: LLMConfig) -> LLMRuntimeConfig:
     return LLMRuntimeConfig(
         provider=config.provider,
@@ -244,10 +248,9 @@ def answer_question(
 ) -> tuple[str, str, str | None]:
     recent_usage = recent_usage or []
     recent_chats = recent_chats or []
-    fallback_answer = answer_question_with_rules(user, prediction, question, recent_usage)
 
     if not llm_config or not llm_config.enabled:
-        return fallback_answer, "rules", None
+        raise ChatLLMUnavailableError("智能问答需要先在“模型设置”中配置并启用大模型。")
 
     prediction_summary = _format_prediction(prediction) if prediction else "prediction=None"
     messages = [
@@ -279,7 +282,11 @@ def answer_question(
             max_tokens=650,
         )
     except LLMServiceError as exc:
-        return fallback_answer, "rules", str(exc)
+        raise ChatLLMUnavailableError(f"大模型问答调用失败：{exc}") from exc
+
+    answer = answer.strip()
+    if not answer:
+        raise ChatLLMUnavailableError("大模型返回了空内容，请检查模型配置或更换模型。")
 
     return answer, "llm", None
 

@@ -3,19 +3,22 @@ export default function Panel({
   kicker,
   note,
   actions = null,
+  headerAside = null,
   className = "",
   children
 }) {
+  const sideContent = headerAside || actions;
+
   return (
     <section className={`panel ${className}`.trim()}>
-      {(title || kicker || note || actions) && (
-        <div className="module-header">
-          <div>
+      {(title || kicker || note || sideContent) && (
+        <div className={`module-header ${sideContent ? "has-aside" : "is-simple"}`.trim()}>
+          <div className="module-header-main">
             {kicker ? <p className="panel-kicker">{kicker}</p> : null}
             {title ? <h2>{title}</h2> : null}
             {note ? <p className="topbar-copy">{note}</p> : null}
           </div>
-          {actions}
+          {sideContent ? <div className="module-header-side">{sideContent}</div> : null}
         </div>
       )}
       {children}

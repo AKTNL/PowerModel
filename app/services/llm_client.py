@@ -28,6 +28,33 @@ def _chat_completions_url(base_url: str) -> str:
     return f"{base_url.rstrip('/')}/chat/completions"
 
 
+def _should_disable_thinking(config: LLMRuntimeConfig) -> bool:
+    model_name = config.model_name.lower()
+    base_url = config.base_url.lower()
+    return model_name.startswith("glm-4.7") or ("bigmodel.cn" in base_url and model_name.startswith("glm-"))
+
+
+def _extract_error_message(body: str) -> str:
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return body
+
+    error_payload = payload.get("error")
+    if isinstance(error_payload, dict):
+        message = error_payload.get("message")
+        code = error_payload.get("code")
+        if message and code:
+            return f"{message} (code: {code})"
+        if message:
+            return str(message)
+
+    message = payload.get("message")
+    if message:
+        return str(message)
+    return body
+
+
 def _extract_content(payload: dict) -> str:
     choices = payload.get("choices") or []
     if not choices:
@@ -36,7 +63,9 @@ def _extract_content(payload: dict) -> str:
     message = choices[0].get("message") or {}
     content = message.get("content")
     if isinstance(content, str):
-        return content.strip()
+        text = content.strip()
+        if text:
+            return text
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -44,6 +73,21 @@ def _extract_content(payload: dict) -> str:
             if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
                 parts.append(str(item["text"]))
         text = "\n".join(parts).strip()
+        if text:
+            return text
+
+    if message.get("reasoning_content"):
+        finish_reason = choices[0].get("finish_reason")
+        if finish_reason == "length":
+            raise LLMServiceError(
+                "The model used up the output budget on reasoning and did not return a final answer."
+            )
+        raise LLMServiceError(
+            "The model returned reasoning content but no final answer."
+        )
+
+    if isinstance(choices[0].get("text"), str):
+        text = choices[0]["text"].strip()
         if text:
             return text
 
@@ -57,15 +101,17 @@ def call_openai_compatible(
     max_tokens: int = 800,
     timeout: int = 60,
 ) -> str:
-    payload = json.dumps(
-        {
-            "model": config.model_name,
-            "messages": messages,
-            "temperature": config.temperature,
-            "max_tokens": max_tokens,
-            "stream": False,
-        }
-    ).encode("utf-8")
+    request_payload = {
+        "model": config.model_name,
+        "messages": messages,
+        "temperature": config.temperature,
+        "max_tokens": max_tokens,
+        "stream": False,
+    }
+    if _should_disable_thinking(config):
+        request_payload["thinking"] = {"type": "disabled"}
+
+    payload = json.dumps(request_payload).encode("utf-8")
 
     http_request = request.Request(
         _chat_completions_url(config.base_url),
@@ -82,7 +128,8 @@ def call_openai_compatible(
             raw_body = response.read().decode("utf-8")
     except error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="ignore")
-        raise LLMServiceError(f"LLM request failed with HTTP {exc.code}: {body}") from exc
+        message = _extract_error_message(body)
+        raise LLMServiceError(f"LLM request failed with HTTP {exc.code}: {message}") from exc
     except error.URLError as exc:
         raise LLMServiceError(f"Failed to connect to the model endpoint: {exc.reason}") from exc
     except TimeoutError as exc:
@@ -109,4 +156,3 @@ def test_openai_compatible_connection(config: LLMRuntimeConfig, prompt: str) -> 
         max_tokens=60,
         timeout=30,
     )
-
