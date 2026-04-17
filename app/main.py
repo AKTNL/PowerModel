@@ -66,4 +66,9 @@ def root():
 
 @app.get("/health")
 def health() -> JSONResponse:
-    return JSONResponse({"message": "Household Power Assistant API is running"})
+    return JSONResponse(
+        {
+            "message": "Household Power Assistant API is running",
+            "database_backend": engine.url.get_backend_name(),
+        }
+    )

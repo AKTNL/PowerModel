@@ -6,12 +6,28 @@ export default function Sidebar({
   llmConfig,
   usageCount,
   latestPrediction,
-  onNavigate
+  onNavigate,
+  isCollapsed,
+  onToggleCollapse
 }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <p className="eyebrow">Household Power</p>
+        <div className="sidebar-brand-bar">
+          <p className="eyebrow">Household Power</p>
+          <button
+            type="button"
+            className="sidebar-collapse-button"
+            onClick={onToggleCollapse}
+            aria-label={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
+            aria-pressed={isCollapsed}
+            title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
+          >
+            <span className={`sidebar-collapse-icon ${isCollapsed ? "is-collapsed" : ""}`.trim()}>
+              {isCollapsed ? ">>" : "<<"}
+            </span>
+          </button>
+        </div>
         <h1>家庭用电智能助手</h1>
         <p className="sidebar-copy">
           用传统预测模型做数值估计，用大模型做解释、建议和问答，让整个 Demo 更完整。
@@ -44,6 +60,8 @@ export default function Sidebar({
               type="button"
               className={`sidebar-link ${active ? "is-active" : ""}`.trim()}
               onClick={() => onNavigate(item.key)}
+              title={item.title}
+              aria-label={item.title}
             >
               <span className="sidebar-link-icon">{item.icon}</span>
               <span className="sidebar-link-main">

@@ -27,11 +27,7 @@ export const VIEW_META = {
   },
   chat: {
     name: "智能问答",
-    note: "在这里直接向大模型提问，页面只保留当前提问和最新回复。"
-  },
-  history: {
-    name: "历史对话",
-    note: "集中查看最近的问答记录，避免把聊天页堆得过于臃肿。"
+    note: "左侧查看历史对话，右侧继续当前提问与回复。"
   }
 };
 
@@ -77,12 +73,6 @@ export const NAV_ITEMS = [
     icon: "QA",
     title: "智能问答",
     note: "向大模型直接发起提问"
-  },
-  {
-    key: "history",
-    icon: "HS",
-    title: "历史对话",
-    note: "集中查看最近的问答记录"
   }
 ];
 

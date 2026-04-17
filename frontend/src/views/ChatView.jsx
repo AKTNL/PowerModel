@@ -1,13 +1,28 @@
+import { useEffect, useState } from "react";
+
 import Panel from "../components/Panel.jsx";
 import { QUICK_QUESTIONS, formatDateTime } from "../lib/powerUtils.js";
 
+function summarizeText(value, maxLength = 56) {
+  const normalized = `${value || ""}`.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "暂无内容";
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
 export default function ChatView({
+  chatHistory,
   chatQuestion,
   onQuestionChange,
   onQuestionKeyDown,
   onSend,
   onQuickQuestion,
-  onOpenHistory,
   latestChat,
   historyCount,
   llmEnabled,
@@ -16,21 +31,85 @@ export default function ChatView({
   chatError
 }) {
   const disabled = !llmEnabled || isChatLoading;
+  const [selectedChatId, setSelectedChatId] = useState(() => latestChat?.id ?? null);
+
+  useEffect(() => {
+    if (isChatLoading) {
+      return;
+    }
+
+    if (!chatHistory.length) {
+      setSelectedChatId(null);
+      return;
+    }
+
+    if (!chatHistory.some((item) => item.id === selectedChatId)) {
+      setSelectedChatId(chatHistory.at(-1)?.id ?? null);
+    }
+  }, [chatHistory, isChatLoading, selectedChatId]);
+
+  useEffect(() => {
+    if (!isChatLoading && latestChat?.id) {
+      setSelectedChatId(latestChat.id);
+    }
+  }, [latestChat?.id, isChatLoading]);
+
+  const selectedChat = chatHistory.find((item) => item.id === selectedChatId) || latestChat || null;
 
   return (
     <div className="module-view is-active" data-view="chat">
-      <div className="page-grid">
+      <div className="chat-workspace">
+        <section className="side-panel chat-history-panel">
+          <div className="side-panel-head">
+            <p className="panel-kicker">Archive</p>
+            <h3>历史对话</h3>
+          </div>
+
+          <div className="chat-history-panel-meta">
+            <div className="intro-pill">
+              <span>记录总数</span>
+              <strong>{historyCount}</strong>
+            </div>
+            <div className="intro-pill">
+              <span>当前状态</span>
+              <strong>{isChatLoading ? "思考中" : "可提问"}</strong>
+            </div>
+          </div>
+
+          {chatHistory.length ? (
+            <div className="chat-session-list">
+              {[...chatHistory].reverse().map((item) => {
+                const active = !isChatLoading && item.id === selectedChatId;
+
+                return (
+                  <button
+                    key={item.id ?? `${item.created_at}-${item.question}`}
+                    type="button"
+                    className={`chat-session-card ${active ? "is-active" : ""}`.trim()}
+                    onClick={() => setSelectedChatId(item.id ?? null)}
+                  >
+                    <div className="chat-session-head">
+                      <strong className="chat-session-title">{summarizeText(item.question, 24)}</strong>
+                      <span className="chat-session-time">{formatDateTime(item.created_at)}</span>
+                    </div>
+                    <p className="chat-session-preview">{summarizeText(item.answer, 72)}</p>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="chat-history-empty">
+              <strong>还没有历史对话</strong>
+              <p>发送第一条问题后，这里会按时间顺序保留最近的问答记录。</p>
+            </div>
+          )}
+        </section>
+
         <Panel
           kicker="Chat"
           title="智能问答"
-          note="这里保留提问输入和最新一轮回复；完整历史已经拆到单独页面。"
-          actions={
-            <div className="prediction-actions">
-              <button type="button" className="ghost-button" onClick={onOpenHistory}>
-                查看历史对话
-              </button>
-            </div>
-          }
+          note="左侧快速回看历史记录，右侧继续当前提问、查看完整回复。"
+          className="chat-main-panel"
         >
           <div className="page-intro-strip">
             <div className="intro-pill">
@@ -75,7 +154,7 @@ export default function ChatView({
                 value={chatQuestion}
                 onChange={onQuestionChange}
                 onKeyDown={onQuestionKeyDown}
-                placeholder="例如：为什么这个月的预测比上个月高？"
+                placeholder="例如：为什么这个月的预测比上个月更高？"
                 disabled={disabled}
               />
             </label>
@@ -108,24 +187,24 @@ export default function ChatView({
                 </div>
               </div>
             </div>
-          ) : latestChat ? (
+          ) : selectedChat ? (
             <div className="chat-history chat-history-elevated">
               <div className="chat-item chat-pair current-chat-card">
                 <div className="chat-bubble chat-bubble-question">
                   <div className="chat-meta">
-                    <span className="chat-role">Latest Question</span>
-                    <span className="chat-mode">{formatDateTime(latestChat.created_at)}</span>
+                    <span className="chat-role">Question</span>
+                    <span className="chat-mode">{formatDateTime(selectedChat.created_at)}</span>
                   </div>
-                  <div className="rich-text">{latestChat.question}</div>
+                  <div className="rich-text">{selectedChat.question}</div>
                 </div>
 
                 <div className="chat-bubble chat-bubble-answer">
                   <div className="chat-meta">
-                    <span className="chat-role">Latest Answer</span>
-                    <span className="chat-mode">{latestChat.generation_mode || "llm"}</span>
+                    <span className="chat-role">Answer</span>
+                    <span className="chat-mode">{selectedChat.generation_mode || "llm"}</span>
                   </div>
-                  <div className={`rich-text ${latestChat.answer ? "" : "empty-state"}`.trim()}>
-                    {latestChat.answer || "本次没有返回有效回答，请检查右侧状态或重新提问。"}
+                  <div className={`rich-text ${selectedChat.answer ? "" : "empty-state"}`.trim()}>
+                    {selectedChat.answer || "本次没有返回有效回答，请检查模型状态后重新提问。"}
                   </div>
                 </div>
               </div>
@@ -136,49 +215,22 @@ export default function ChatView({
               <p>配置好模型后，点击上方快捷问题或直接输入你的问题开始对话。</p>
             </div>
           )}
+
+          <div className="chat-prompt-notes">
+            <article className="chat-note-card">
+              <strong>尽量问具体问题</strong>
+              <p>例如“为什么比上个月高”或“空调每天少开 1 小时会怎样”，比泛泛提问更容易得到可执行回答。</p>
+            </article>
+            <article className="chat-note-card">
+              <strong>优先围绕当前预测追问</strong>
+              <p>系统会自动带入最近预测、历史用电和家庭画像，围绕这些内容提问通常效果更好。</p>
+            </article>
+            <article className="chat-note-card">
+              <strong>左侧可回看历史记录</strong>
+              <p>点击左侧任一问答即可在右侧查看完整内容，不需要再切换到独立历史页面。</p>
+            </article>
+          </div>
         </Panel>
-
-        <div className="page-side-stack">
-          <section className="side-panel">
-            <div className="side-panel-head">
-              <p className="panel-kicker">Status</p>
-              <h3>对话状态</h3>
-            </div>
-            <div className="status-tile-grid">
-              <article className={`status-tile ${llmEnabled ? "status-green" : "status-warm"}`.trim()}>
-                <span>模型连接</span>
-                <strong>{llmEnabled ? "READY" : "OFF"}</strong>
-                <p>{llmEnabled ? "当前可以直接发起大模型问答。" : "需要先在模型设置页面完成配置。"}</p>
-              </article>
-              <article className={`status-tile ${isChatLoading ? "status-green" : ""}`.trim()}>
-                <span>当前流程</span>
-                <strong>{isChatLoading ? "BUSY" : "IDLE"}</strong>
-                <p>{isChatLoading ? "模型正在生成回复，请稍等。" : `最近已累计 ${historyCount} 条历史问答。`}</p>
-              </article>
-            </div>
-          </section>
-
-          <section className="side-panel">
-            <div className="side-panel-head">
-              <p className="panel-kicker">Prompting</p>
-              <h3>提问建议</h3>
-            </div>
-            <div className="info-list">
-              <div className="info-list-item">
-                <strong>尽量问具体问题</strong>
-                <p>例如“为什么比上个月高”“如果空调每天少开 1 小时会怎样”，比泛泛提问更容易拿到可执行回答。</p>
-              </div>
-              <div className="info-list-item">
-                <strong>优先围绕当前预测追问</strong>
-                <p>系统会自动带入最近一次预测结果、历史用电和家庭画像，围绕这些内容提问效果最好。</p>
-              </div>
-              <div className="info-list-item">
-                <strong>历史记录已经独立出去</strong>
-                <p>如果你需要回看之前的多轮问答，直接点击“查看历史对话”会更清楚。</p>
-              </div>
-            </div>
-          </section>
-        </div>
       </div>
     </div>
   );

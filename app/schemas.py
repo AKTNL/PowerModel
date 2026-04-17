@@ -138,6 +138,16 @@ class ChatRequest(BaseModel):
     user_id: int
     question: str = Field(min_length=2)
 
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 2:
+            raise ValueError("question must contain at least 2 non-space characters")
+        if all(char in {"?", "？", "�"} or char.isspace() for char in normalized):
+            raise ValueError("question cannot contain only placeholder characters")
+        return normalized
+
 
 class ChatRead(BaseModel):
     id: int

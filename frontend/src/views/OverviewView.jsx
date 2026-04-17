@@ -1,27 +1,6 @@
 import Panel from "../components/Panel.jsx";
 import { formatNumber } from "../lib/powerUtils.js";
 
-const SHORTCUTS = [
-  {
-    key: "profile",
-    index: "01",
-    title: "创建家庭画像",
-    note: "先建立用户档案，后续的数据、模型和预测都会绑定到这个家庭。"
-  },
-  {
-    key: "usage",
-    index: "02",
-    title: "上传历史用电",
-    note: "录入至少 3 个月的月度用电记录，系统才能开始做稳定预测。"
-  },
-  {
-    key: "prediction",
-    index: "03",
-    title: "生成预测与建议",
-    note: "跑出预测值后，再调用大模型做解释、建议和问答增强。"
-  }
-];
-
 function getTrendBars(records) {
   const recent = records.slice(-6);
   const max = Math.max(...recent.map((item) => Number(item.power_kwh) || 0), 1);
@@ -60,8 +39,7 @@ export default function OverviewView({
   overview,
   records,
   prediction,
-  llmConfig,
-  onNavigate
+  llmConfig
 }) {
   const trendBars = getTrendBars(records);
   const recentAverage =
@@ -212,27 +190,6 @@ export default function OverviewView({
             <strong>{overview.predictionKwh}</strong>
             <p>{overview.predictionDesc}</p>
           </article>
-        </div>
-      </Panel>
-
-      <Panel
-        kicker="Runbook"
-        title="推荐演示路径"
-        note="如果你要现场演示，这里可以直接作为开场页，按顺序点进去就行。"
-      >
-        <div className="shortcut-grid">
-          {SHORTCUTS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className="shortcut-card"
-              onClick={() => onNavigate(item.key)}
-            >
-              <span>{item.index}</span>
-              <strong>{item.title}</strong>
-              <p>{item.note}</p>
-            </button>
-          ))}
         </div>
       </Panel>
     </div>

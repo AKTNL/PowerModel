@@ -7,9 +7,7 @@
 - `数值预测`：由后端预测模块完成，用历史月度用电数据估算下个月的用电量和电费
 - `智能解释`：由大模型负责生成原因分析、节能建议和问答回复
 
-当前版本适合课程设计、比赛 Demo 和原型验证。它已经包含完整的前后端：
-
-- 后端：`FastAPI + SQLite`
+- 后端：`FastAPI + SQLite / PostgreSQL`
 - 前端：`React + Vite`
 - 大模型接入：`OpenAI-compatible /chat/completions`
 
@@ -20,15 +18,17 @@
 - 预测下个月用电量、电费和波动区间
 - 输出预测原因分析和节能建议
 - 支持情景模拟，例如减少空调或热水器使用时长
-- 支持智能问答
+- 支持智能问答，采用“左侧历史对话 + 右侧当前问答”的双栏布局
+- 侧边栏支持桌面端收缩，便于把主要空间留给业务页面
 - 支持用户填写自己的模型 `base_url / api_key / model_name`
+- 支持通过 `DATABASE_URL` 切换 `SQLite / PostgreSQL`
 - 当外部模型不可用时，自动回退到规则版解释和问答
 
 ## 技术栈
 
 - Backend: `FastAPI`, `SQLAlchemy`, `Pydantic`, `Uvicorn`
 - Frontend: `React`, `Vite`
-- Database: `SQLite`
+- Database: `SQLite / PostgreSQL`
 - LLM Access: OpenAI-compatible HTTP API
 
 ## 项目结构
@@ -36,7 +36,7 @@
 ```text
 app/
   main.py                # FastAPI 入口，同时负责服务前端构建产物
-  database.py            # SQLite 和 Session 配置
+  database.py            # 数据库 URL、Engine 和 Session 配置
   models.py              # 数据库模型
   schemas.py             # 请求/响应模型
   routers/               # 各模块 API
@@ -45,15 +45,46 @@ app/
 frontend/
   src/
     components/          # Sidebar / Topbar / Toast / Chart 等组件
+    constants/           # 前端默认值和本地存储键
+    hooks/               # 应用状态与交互逻辑
+    lib/                 # 工具函数与视图数据拼装
+    services/            # 前端 API 请求层
     views/               # 各个业务模块页面
-    lib/                 # API 请求和前端工具函数
   index.html             # Vite 入口
   styles.css             # 全局样式
   package.json           # 前端依赖和脚本
   vite.config.js         # Vite 配置
 
+scripts/
+  migrate_sqlite_to_postgres.py   # SQLite 迁移到 PostgreSQL 的一次性脚本
+
 requirements.txt         # 后端依赖
 ```
+
+## 数据库配置
+
+默认情况下，项目使用仓库根目录下的 `SQLite`：
+
+- `sqlite:///./household_power.db`
+
+如果你想把用户、历史用电、预测记录、模型配置、历史对话等信息放到 `PostgreSQL`，只需要在启动前设置 `DATABASE_URL`：
+
+```powershell
+$env:DATABASE_URL = "postgresql://postgres:password@127.0.0.1:5432/household_power"
+```
+
+程序会自动把它规范化成 `SQLAlchemy + psycopg` 所需的连接形式，不需要你手动写驱动前缀。
+
+启动后可通过健康检查确认当前数据库后端：
+
+```text
+GET /health
+```
+
+返回里会包含：
+
+- `database_backend: sqlite`
+- 或 `database_backend: postgresql`
 
 ## 运行环境
 
@@ -155,7 +186,7 @@ cd ..
 7. 点击 `运行预测`
 8. 如果你有自己的大模型 API，再进入 `模型设置` 测试并保存
 9. 回到 `预测与建议` 点击 `重新生成建议`
-10. 最后到 `情景模拟` 和 `智能问答` 继续演示
+10. 最后到 `情景模拟` 和 `智能问答` 继续演示，其中 `智能问答` 左侧可回看历史记录，右侧继续新问题
 
 ## 如何接入你自己的大模型
 
@@ -184,7 +215,7 @@ cd ..
 
 ### 注意事项
 
-- 当前版本会把用户填写的模型配置保存在本地 SQLite 数据库中
+- 当前版本会把用户填写的模型配置保存在当前启用的数据库中
 - `GET /llm/config/{user_id}` 返回时会掩码显示 API Key
 - 这是课程/原型项目，不适合直接作为生产级密钥管理方案
 
@@ -252,17 +283,35 @@ http://127.0.0.1:5173/
 
 ## 数据与存储
 
-项目运行后会在根目录自动生成本地数据库：
+如果你使用默认配置，项目运行后会在根目录自动生成本地数据库：
 
 - `household_power.db`
 
-这个数据库会保存：
+当前启用的数据库会保存：
 
 - 用户画像
 - 历史用电记录
 - 预测记录
 - 聊天记录
 - 模型配置
+
+如果你已经有一份现成的 `SQLite` 数据，想迁移到 `PostgreSQL`，可以使用仓库里的脚本：
+
+```powershell
+$env:DATABASE_URL = "postgresql://postgres:password@127.0.0.1:5432/household_power"
+.\.venv\Scripts\python.exe scripts\migrate_sqlite_to_postgres.py
+```
+
+如果源 SQLite 文件不在默认位置，可以额外指定：
+
+```powershell
+$env:SOURCE_DATABASE_URL = "sqlite:///./household_power.db"
+```
+
+注意：
+
+- 迁移脚本会把已有聊天历史一并复制到新库
+- 但如果旧记录本身已经是 `????`，迁移后仍然会是 `????`，因为原始中文在写入旧记录时就已经丢失了
 
 ## 主要接口
 
@@ -420,11 +469,22 @@ npm.cmd run dev
 
 项目会自动回退到规则版，不会让主流程中断。
 
-### 5. 预测时报错 “At least 3 months of usage data are required for prediction”
+### 5. 历史问答里出现 `????`
+
+这通常不是 `SQLite` 本身不支持中文，而是某次输入链路在写入数据库之前就已经把文本损坏成了问号。
+
+当前版本已经做了两层保护：
+
+- 前端会拦截“全是问号”的异常问题输入
+- 后端 `ChatRequest` 校验也会拒绝只包含占位问号的内容
+
+如果旧记录已经写成 `????`，迁移到 `PostgreSQL` 后也不会自动恢复，因为原始文本已经丢失。
+
+### 6. 预测时报错 “At least 3 months of usage data are required for prediction”
 
 当前版本至少需要 `3` 个月的历史数据才能执行预测。
 
-### 6. 为什么预测不是 LightGBM / XGBoost？
+### 7. 为什么预测不是 LightGBM / XGBoost？
 
 当前仓库里的预测模块还是规则版 MVP，目的是先把产品链路跑通：
 
