@@ -28,6 +28,18 @@ export const VIEW_META = {
   chat: {
     name: "智能问答",
     note: "左侧查看历史对话，右侧继续当前提问与回复。"
+  },
+  nationalOverview: {
+    name: "国家预测总览",
+    note: "查看国家级月度用电预测、参数设置和趋势图表。"
+  },
+  nationalReport: {
+    name: "国家分析报告",
+    note: "查看国家模块自动报告，并在同一页内进行问答。"
+  },
+  nationalSources: {
+    name: "国家数据来源",
+    note: "查看字段说明、官方来源文档和原始清洗数据预览。"
   }
 };
 
@@ -73,6 +85,24 @@ export const NAV_ITEMS = [
     icon: "QA",
     title: "智能问答",
     note: "向大模型直接发起提问"
+  },
+  {
+    key: "nationalOverview",
+    icon: "CN",
+    title: "国家预测",
+    note: "国家级用电趋势和预测"
+  },
+  {
+    key: "nationalReport",
+    icon: "RP",
+    title: "国家报告",
+    note: "查看报告与国家问答"
+  },
+  {
+    key: "nationalSources",
+    icon: "SR",
+    title: "国家来源",
+    note: "查看来源文档与数据"
   }
 ];
 

@@ -3,8 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ChatRecord, LLMConfig, MonthlyUsage, PredictionRecord, UserProfile
+from app.models import ChatRecord, MonthlyUsage, PredictionRecord, UserProfile
 from app.schemas import APIResponse, ChatRead, ChatRequest, ScenarioRequest
+from app.services.llm_registry import resolve_effective_llm_config
 from app.services.advisor import ChatLLMUnavailableError, answer_question, simulate_scenario
 
 
@@ -23,9 +24,7 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> APIResponse:
         .order_by(PredictionRecord.created_at.desc())
     ).first()
 
-    llm_config = db.scalars(
-        select(LLMConfig).where(LLMConfig.user_id == payload.user_id)
-    ).first()
+    llm_config = resolve_effective_llm_config(db, payload.user_id)
     recent_usage = db.scalars(
         select(MonthlyUsage)
         .where(MonthlyUsage.user_id == payload.user_id)

@@ -21,6 +21,7 @@ import {
   normalizeValue,
   parseCsvText
 } from "../lib/powerUtils.js";
+import { isNationalView } from "../lib/nationalUtils.js";
 import {
   buildDraftRows,
   buildOverviewData,
@@ -44,6 +45,7 @@ import {
   testLlmConfig,
   uploadUsage
 } from "../services/appApi.js";
+import { useNationalPowerModule } from "./useNationalPowerModule.js";
 import { useToast } from "./useToast.js";
 
 function readStoredValue(key) {
@@ -64,6 +66,8 @@ function normalizeViewKey(view) {
 
 export function useHouseholdPowerApp() {
   const { toast, showToast } = useToast();
+  const [llmConfig, setLlmConfig] = useState(null);
+  const national = useNationalPowerModule(showToast, llmConfig);
 
   const [currentView, setCurrentView] = useState(() =>
     normalizeViewKey(readStoredValue(STORAGE_KEYS.activeView) || "overview")
@@ -80,7 +84,6 @@ export function useHouseholdPowerApp() {
   const [latestPrediction, setLatestPrediction] = useState(null);
   const [latestPredictionMeta, setLatestPredictionMeta] = useState(null);
   const [targetMonth, setTargetMonth] = useState("");
-  const [llmConfig, setLlmConfig] = useState(null);
   const [llmPreview, setLlmPreview] = useState(DEFAULT_LLM_PREVIEW);
   const [chatHistory, setChatHistory] = useState([]);
   const [chatQuestion, setChatQuestion] = useState("");
@@ -111,6 +114,7 @@ export function useHouseholdPowerApp() {
   }`;
   const latestChat = chatHistory.at(-1) || null;
   const currentMeta = VIEW_META[currentView] || VIEW_META.overview;
+  const inNationalView = isNationalView(currentView);
 
   function navigate(view) {
     startTransition(() => {
@@ -135,8 +139,6 @@ export function useHouseholdPowerApp() {
     setUsageDraft(ensureDraftRows([]));
     setLatestPrediction(null);
     setLatestPredictionMeta(null);
-    setLlmConfig(null);
-    setLlmPreview(DEFAULT_LLM_PREVIEW);
     setChatHistory([]);
     setChatQuestion("");
     setChatError("");
@@ -145,7 +147,6 @@ export function useHouseholdPowerApp() {
     setScenarioForm(DEFAULT_SCENARIO_FORM);
     setScenarioResult(DEFAULT_SCENARIO_RESULT);
     setTargetMonth("");
-    setModelForm(DEFAULT_MODEL_FORM);
   }
 
   function applyLoadedUser(user) {
@@ -171,7 +172,7 @@ export function useHouseholdPowerApp() {
     });
     setLlmPreview({
       tone: "success",
-      text: `已加载模型配置：${config.model_name}，Key：${config.masked_api_key || "已保存"}`
+      text: `已加载平台模型配置：${config.model_name}，Key：${config.masked_api_key || "已保存"}`
     });
   }
 
@@ -180,9 +181,36 @@ export function useHouseholdPowerApp() {
     setModelForm(DEFAULT_MODEL_FORM);
     setLlmPreview({
       tone: "muted",
-      text: "当前用户还没有保存模型配置。"
+      text: "当前还没有保存平台级模型配置。"
     });
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateGlobalLlmConfig() {
+      try {
+        const llmResponse = await fetchLlmConfig();
+        if (!cancelled) {
+          applyLoadedLlmConfig(llmResponse.data.config);
+        }
+      } catch {
+        if (!cancelled) {
+          clearLoadedLlmConfig();
+        }
+      }
+    }
+
+    hydrateGlobalLlmConfig().catch((error) => {
+      if (!cancelled) {
+        showToast(error.message || "加载平台模型配置失败", "error");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function applyLoadedChatHistory(records) {
     setChatHistory(
@@ -243,17 +271,6 @@ export function useHouseholdPowerApp() {
           resetUserBoundState();
         }
         return;
-      }
-
-      try {
-        const llmResponse = await fetchLlmConfig(userId);
-        if (!cancelled) {
-          applyLoadedLlmConfig(llmResponse.data.config);
-        }
-      } catch {
-        if (!cancelled) {
-          clearLoadedLlmConfig();
-        }
       }
 
       try {
@@ -378,9 +395,7 @@ export function useHouseholdPowerApp() {
   }
 
   async function handleSaveLlm() {
-    const numericUserId = requireUserId();
     const response = await saveLlmConfig({
-      user_id: numericUserId,
       provider: modelForm.provider,
       base_url: normalizeValue(modelForm.base_url),
       api_key: normalizeValue(modelForm.api_key),
@@ -393,23 +408,22 @@ export function useHouseholdPowerApp() {
     setModelForm((current) => ({ ...current, api_key: "" }));
     setLlmPreview({
       tone: "success",
-      text: `已保存配置：${response.data.config.model_name} @ ${response.data.config.base_url}`
+      text: `已保存平台配置：${response.data.config.model_name} @ ${response.data.config.base_url}`
     });
     setChatError("");
-    showToast("模型配置已保存");
+    showToast("平台模型配置已保存");
   }
 
   async function handleClearLlm() {
-    const numericUserId = requireUserId();
-    await clearLlmConfig(numericUserId);
+    await clearLlmConfig();
     setLlmConfig(null);
     setModelForm(DEFAULT_MODEL_FORM);
     setLlmPreview({
       tone: "muted",
-      text: "已清除当前用户的模型配置。"
+      text: "已清除平台级模型配置。"
     });
     setChatError("");
-    showToast("模型配置已清除");
+    showToast("平台模型配置已清除");
   }
 
   async function handleRefreshUsage() {
@@ -603,6 +617,13 @@ export function useHouseholdPowerApp() {
       llmConfig,
       usageCount: renderableRecords.length,
       latestPrediction,
+      statusCards: inNationalView
+        ? national.sidebarStatusCards
+        : [
+            { label: "当前用户", value: currentUsername || "尚未创建" },
+            { label: "模型状态", value: llmConfig?.enabled ? llmConfig.model_name : "未配置" },
+            { label: "数据与预测", value: `${renderableRecords.length} 条记录 / ${latestPrediction?.target_month || "--"}` }
+          ],
       onNavigate: navigate,
       isCollapsed: isSidebarCollapsed,
       onToggleCollapse: toggleSidebarCollapse
@@ -612,7 +633,8 @@ export function useHouseholdPowerApp() {
       note: currentMeta.note,
       currentUsername,
       llmConfig,
-      latestPrediction
+      latestPrediction,
+      metaItems: inNationalView ? national.topbarMeta : null
     },
     viewProps: {
       overview: {
@@ -689,7 +711,8 @@ export function useHouseholdPowerApp() {
         isChatLoading,
         pendingQuestion: pendingChatQuestion,
         chatError
-      }
+      },
+      ...national.viewProps
     }
   };
 }

@@ -1,13 +1,20 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
 from app.routers import advice, chat, llm, predict, usage, users
+from app.routers.national import router as national_router
+from app.services.national import NationalServiceError
+from app.state import app_state
+from src.data_loader import DataValidationError
+from src.forecast.sarima_model import ForecastingError
+from src.preprocess import DataProcessingError
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,6 +50,7 @@ app.include_router(predict.router)
 app.include_router(advice.router)
 app.include_router(chat.router)
 app.include_router(llm.router)
+app.include_router(national_router)
 
 if FRONTEND_ASSETS_DIR.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_ASSETS_DIR), name="assets")
@@ -72,3 +80,19 @@ def health() -> JSONResponse:
             "database_backend": engine.url.get_backend_name(),
         }
     )
+
+
+@app.exception_handler(NationalServiceError)
+@app.exception_handler(DataValidationError)
+@app.exception_handler(DataProcessingError)
+@app.exception_handler(ForecastingError)
+def handle_known_errors(_: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"code": 1, "message": str(exc), "detail": str(exc), "data": {}})
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"code": 1, "message": "request validation failed", "detail": exc.errors(), "data": {}})
+
+
+app.state.runtime = app_state

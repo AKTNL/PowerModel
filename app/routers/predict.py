@@ -3,9 +3,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import LLMConfig, PredictionRecord, UserProfile
+from app.models import PredictionRecord, UserProfile
 from app.schemas import APIResponse, PredictionRead, PredictionRequest
 from app.services.advisor import generate_prediction_insights
+from app.services.llm_registry import resolve_effective_llm_config
 from app.services.predictor import predict_usage
 
 
@@ -35,9 +36,7 @@ def predict_monthly(payload: PredictionRequest, db: Session = Depends(get_db)) -
     db.add(prediction)
     db.flush()
 
-    llm_config = db.scalars(
-        select(LLMConfig).where(LLMConfig.user_id == payload.user_id)
-    ).first()
+    llm_config = resolve_effective_llm_config(db, payload.user_id)
     insight = generate_prediction_insights(user, prediction, llm_config)
     prediction.reason_text = insight.reason_text
     prediction.advice_text = insight.advice_text

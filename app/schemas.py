@@ -116,6 +116,10 @@ class LLMConfigUpsertRequest(LLMConfigBase):
     user_id: int
 
 
+class GlobalLLMConfigUpsertRequest(LLMConfigBase):
+    pass
+
+
 class LLMConfigTestRequest(LLMConfigBase):
     prompt: str = Field(default="Reply with OK only.", min_length=2)
 
@@ -132,6 +136,20 @@ class LLMConfigRead(BaseModel):
     masked_api_key: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class GlobalLLMConfigRead(BaseModel):
+    id: int | None = None
+    provider: str
+    base_url: str
+    model_name: str
+    temperature: float
+    enabled: bool
+    has_api_key: bool
+    masked_api_key: str | None = None
+    source: str = "global"
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ChatRequest(BaseModel):

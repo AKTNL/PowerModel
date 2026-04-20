@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import LLMConfig, PredictionRecord, UserProfile
+from app.models import PredictionRecord, UserProfile
 from app.schemas import APIResponse, AdviceRequest
+from app.services.llm_registry import resolve_effective_llm_config
 from app.services.advisor import generate_prediction_insights
 
 
@@ -25,9 +25,7 @@ def regenerate_advice(payload: AdviceRequest, db: Session = Depends(get_db)) -> 
     if not prediction:
         raise HTTPException(status_code=404, detail="Prediction not found")
 
-    llm_config = db.scalars(
-        select(LLMConfig).where(LLMConfig.user_id == payload.user_id)
-    ).first()
+    llm_config = resolve_effective_llm_config(db, payload.user_id)
     insight = generate_prediction_insights(user, prediction, llm_config)
     prediction.reason_text = insight.reason_text
     prediction.advice_text = insight.advice_text

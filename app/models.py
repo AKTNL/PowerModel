@@ -94,6 +94,24 @@ class LLMConfig(Base):
     user: Mapped["UserProfile"] = relationship(back_populates="llm_config")
 
 
+class GlobalLLMConfig(Base):
+    __tablename__ = "global_llm_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    provider: Mapped[str] = mapped_column(String(50), default="openai-compatible")
+    base_url: Mapped[str] = mapped_column(String(255), nullable=False)
+    api_key: Mapped[str] = mapped_column(Text, nullable=False)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    temperature: Mapped[float] = mapped_column(Float, default=0.3)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+
 class ChatRecord(Base):
     __tablename__ = "chat_record"
 

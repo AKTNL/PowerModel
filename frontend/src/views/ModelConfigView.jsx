@@ -14,8 +14,8 @@ export default function ModelConfigView({
       <div className="page-grid">
         <Panel
           kicker="LLM"
-          title="模型设置"
-          note="这里接入你自己的 OpenAI 兼容模型。数值预测仍由后端完成，大模型主要负责解释、建议和问答。"
+          title="平台模型设置"
+          note="这里配置整个平台共用的 OpenAI 兼容模型。家庭预测和国家预测都会默认使用这份配置。"
         >
           <div className="page-intro-strip">
             <div className="intro-pill">
@@ -25,6 +25,10 @@ export default function ModelConfigView({
             <div className="intro-pill">
               <span>建议顺序</span>
               <strong>先测试，再保存</strong>
+            </div>
+            <div className="intro-pill">
+              <span>生效范围</span>
+              <strong>家庭 + 国家模块</strong>
             </div>
           </div>
 
@@ -100,9 +104,9 @@ export default function ModelConfigView({
             </div>
             <div className="status-tile-grid">
               <article className="status-tile">
-                <span>当前模型</span>
+                <span>当前平台模型</span>
                 <strong>{llmConfig?.enabled ? llmConfig.model_name : "--"}</strong>
-                <p>{llmConfig?.enabled ? llmConfig.base_url : "当前用户还没有保存模型配置。"}</p>
+                <p>{llmConfig?.enabled ? llmConfig.base_url : "当前还没有保存平台级模型配置。"}</p>
               </article>
               <article className="status-tile status-warm">
                 <span>API Key 状态</span>
@@ -124,7 +128,7 @@ export default function ModelConfigView({
               </div>
               <div className="info-list-item">
                 <strong>先测试再保存</strong>
-                <p>这样能更快定位是地址、Key 还是模型名的问题。</p>
+                <p>这样能更快定位是地址、Key 还是模型名的问题，保存后家庭和国家模块都会复用它。</p>
               </div>
               <div className="info-list-item">
                 <strong>问答必须依赖大模型</strong>

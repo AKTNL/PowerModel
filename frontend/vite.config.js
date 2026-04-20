@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      "/api": apiProxyTarget,
       "/users": apiProxyTarget,
       "/usage": apiProxyTarget,
       "/predict": apiProxyTarget,
@@ -24,4 +25,3 @@ export default defineConfig({
     emptyOutDir: true
   }
 });
-

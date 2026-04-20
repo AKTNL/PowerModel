@@ -11,8 +11,8 @@ export function fetchUser(userId) {
   return requestJson(`/users/${userId}`);
 }
 
-export function fetchLlmConfig(userId) {
-  return requestJson(`/llm/config/${userId}`);
+export function fetchLlmConfig() {
+  return requestJson("/llm/config");
 }
 
 export function testLlmConfig(payload) {
@@ -29,8 +29,8 @@ export function saveLlmConfig(payload) {
   });
 }
 
-export function clearLlmConfig(userId) {
-  return requestJson(`/llm/config/${userId}`, {
+export function clearLlmConfig() {
+  return requestJson("/llm/config", {
     method: "DELETE"
   });
 }

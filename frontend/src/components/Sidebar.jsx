@@ -6,10 +6,19 @@ export default function Sidebar({
   llmConfig,
   usageCount,
   latestPrediction,
+  statusCards,
   onNavigate,
   isCollapsed,
   onToggleCollapse
 }) {
+  const cards =
+    statusCards ||
+    [
+      { label: "当前用户", value: currentUsername || "尚未创建" },
+      { label: "模型状态", value: llmConfig?.enabled ? llmConfig.model_name : "未配置" },
+      { label: "数据与预测", value: `${usageCount} 条记录 / ${latestPrediction?.target_month || "--"}` }
+    ];
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -28,27 +37,19 @@ export default function Sidebar({
             </span>
           </button>
         </div>
-        <h1>家庭用电智能助手</h1>
+        <h1>家庭 + 国家用电预测平台</h1>
         <p className="sidebar-copy">
-          用传统预测模型做数值估计，用大模型做解释、建议和问答，让整个 Demo 更完整。
+          用统一的交互框架承载家庭预测和国家预测两套业务，让演示路径、页面风格和后续扩展都保持一致。
         </p>
       </div>
 
       <div className="sidebar-status">
-        <div className="status-card">
-          <span className="status-label">当前用户</span>
-          <strong>{currentUsername || "尚未创建"}</strong>
-        </div>
-        <div className="status-card">
-          <span className="status-label">模型状态</span>
-          <strong>{llmConfig?.enabled ? llmConfig.model_name : "未配置"}</strong>
-        </div>
-        <div className="status-card">
-          <span className="status-label">数据与预测</span>
-          <strong>
-            {usageCount} 条记录 / {latestPrediction?.target_month || "--"}
-          </strong>
-        </div>
+        {cards.map((item) => (
+          <div className="status-card" key={item.label}>
+            <span className="status-label">{item.label}</span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
       </div>
 
       <nav className="sidebar-nav">
@@ -76,7 +77,7 @@ export default function Sidebar({
 
       <div className="sidebar-footer">
         <p className="subtle-note">
-          前端现已切换为 React 组件化结构，后端接口保持不变，便于后续继续扩展图表和交互。
+          现在这套壳既能跑家庭用户场景，也能承载国家级月度电力预测模块。
         </p>
       </div>
     </aside>

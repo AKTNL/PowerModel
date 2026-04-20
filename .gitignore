@@ -1,4 +1,6 @@
 .venv312/
+.venv/
+.workbuddy/
 __pycache__/
 *.pyc
 household_power.db
