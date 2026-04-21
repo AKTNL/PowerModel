@@ -1735,6 +1735,7 @@ select:focus-visible {
   position: absolute;
   inset: 0 0 auto 0;
   height: 1px;
+  border-radius: inherit;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(115, 199, 255, 0.14), transparent 80%);
 }
 
@@ -2517,6 +2518,63 @@ code {
 .national-chart-grid,
 .national-source-grid {
   align-items: start;
+}
+
+.national-source-grid .usage-card,
+[data-view="national-sources"] .insight-card {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.national-source-table-shell {
+  margin-top: 14px;
+  padding: 0 2px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.012)),
+    rgba(8, 17, 26, 0.72);
+  clip-path: inset(0 round 20px);
+  scrollbar-gutter: stable;
+}
+
+.national-source-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.national-source-table th:first-child {
+  border-top-left-radius: 18px;
+}
+
+.national-source-table th:last-child {
+  border-top-right-radius: 18px;
+}
+
+.national-source-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 16px;
+}
+
+.national-source-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 16px;
+}
+
+.national-source-table-shell::-webkit-scrollbar {
+  height: 8px;
+}
+
+.national-source-table-shell::-webkit-scrollbar-track {
+  margin: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.national-source-table-shell::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(115, 199, 255, 0.24);
+  background-clip: padding-box;
 }
 
 .national-table-card {

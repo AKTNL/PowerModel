@@ -36,8 +36,8 @@ function renderTable(rows, title) {
         <h3>{title}</h3>
         <span className="status-label">{rows.length} 行</span>
       </div>
-      <div className="table-shell">
-        <table className="usage-table">
+      <div className="table-shell national-source-table-shell">
+        <table className="usage-table national-source-table">
           <thead>
             <tr>
               {columns.map((column) => (
