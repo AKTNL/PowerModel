@@ -1,90 +1,81 @@
-# 家庭用电预测与节能建议助手
+# 家庭 + 国家用电预测平台
 
-一个面向家庭用电场景的 AI 应用 Demo。
+一个面向能源预测场景的全栈 AI 应用 Demo。项目把家庭月度用电预测、国家级月度用电预测、模型接入、分析报告和智能问答整合到同一个深色科技风后台中，方便演示完整的数据录入、预测、解释和问答闭环。
 
-这个项目把两类能力拆开了：
+核心思路：
 
-- `数值预测`：由后端预测模块完成，用历史月度用电数据估算下个月的用电量和电费
-- `智能解释`：由大模型负责生成原因分析、节能建议和问答回复
-
-- 后端：`FastAPI + SQLite / PostgreSQL`
-- 前端：`React + Vite`
-- 大模型接入：`OpenAI-compatible /chat/completions`
+- `数值预测`：后端负责家庭用电预测和国家级 SARIMA 时间序列预测。
+- `智能解释`：OpenAI 兼容大模型用于报告润色、预测解释、节能建议和问答。
+- `规则兜底`：外部模型不可用时，系统自动回退到本地规则解释和问答，不中断主流程。
 
 ## 功能特性
 
-- 创建家庭用户和基础画像
-- 录入或导入历史月度用电数据
-- 预测下个月用电量、电费和波动区间
-- 输出预测原因分析和节能建议
-- 支持情景模拟，例如减少空调或热水器使用时长
-- 支持智能问答，采用“左侧历史对话 + 右侧当前问答”的双栏布局
-- 侧边栏支持桌面端收缩，便于把主要空间留给业务页面
-- 支持用户填写自己的模型 `base_url / api_key / model_name`
-- 支持通过 `DATABASE_URL` 切换 `SQLite / PostgreSQL`
-- 当外部模型不可用时，自动回退到规则版解释和问答
+- 家庭画像创建与维护。
+- 历史月度用电数据手工录入、示例填充和 CSV 导入。
+- 家庭下月用电量、电费区间和节能建议生成。
+- 情景模拟，例如减少空调或热水器使用时长后的节电效果。
+- 智能问答，支持历史会话回看和当前问题继续追问。
+- 国家用电预测总览，支持官方公开数据和自定义 CSV。
+- 国家级 SARIMA 预测、预测区间、季节性图表和预测结果表。
+- 国家分析报告，支持本地规则报告和云端大模型润色。
+- 国家数据来源页面，展示字段说明、官方来源和原始/清洗数据预览。
+- 平台级模型设置，家庭模块和国家模块共用一份 OpenAI 兼容配置。
+- 暗色科技风后台界面，支持左侧导航展开/收纳、图标导航和 tooltip。
+- 支持通过 `DATABASE_URL` 在 `SQLite / PostgreSQL` 之间切换。
 
 ## 技术栈
 
 - Backend: `FastAPI`, `SQLAlchemy`, `Pydantic`, `Uvicorn`
-- Frontend: `React`, `Vite`
+- Forecast: `pandas`, `numpy`, `statsmodels`, `scipy`
+- Frontend: `React 19`, `Vite 7`
 - Database: `SQLite / PostgreSQL`
-- LLM Access: OpenAI-compatible HTTP API
+- LLM Access: OpenAI-compatible `chat/completions`
 
 ## 项目结构
 
 ```text
 app/
-  main.py                # FastAPI 入口，同时负责服务前端构建产物
-  database.py            # 数据库 URL、Engine 和 Session 配置
-  models.py              # 数据库模型
-  schemas.py             # 请求/响应模型
-  routers/               # 各模块 API
-  services/              # 预测、建议、LLM 调用逻辑
+  main.py                         # FastAPI 入口，同时服务前端构建产物
+  database.py                     # 数据库 URL、Engine 和 Session 配置
+  models.py                       # 数据库模型
+  schemas.py                      # 家庭模块请求/响应模型
+  national_schemas.py             # 国家模块请求/响应模型
+  routers/                        # 用户、用电、预测、问答、模型、国家模块 API
+  services/                       # 预测、建议、LLM、国家模块业务逻辑
+
+src/
+  data_loader.py                  # 国家数据加载
+  preprocess.py                   # 国家数据清洗
+  forecast/sarima_model.py        # 国家 SARIMA 预测模型
+  analysis/                       # 国家报告生成和规则问答
+  llm/client.py                   # 国家模块 LLM 客户端
+  config.py                       # 国家模块字段、预测窗口和默认数据配置
 
 frontend/
   src/
-    components/          # Sidebar / Topbar / Toast / Chart 等组件
-    constants/           # 前端默认值和本地存储键
-    hooks/               # 应用状态与交互逻辑
-    lib/                 # 工具函数与视图数据拼装
-    services/            # 前端 API 请求层
-    views/               # 各个业务模块页面
-  index.html             # Vite 入口
-  styles.css             # 全局样式
-  package.json           # 前端依赖和脚本
-  vite.config.js         # Vite 配置
+    components/                   # Sidebar / Topbar / Chart / Panel / Toast 等组件
+    constants/                    # 前端默认值、模型预设和本地存储键
+    hooks/                        # 家庭模块与国家模块状态管理
+    lib/                          # 工具函数与视图数据拼装
+    services/                     # 前端 API 请求层
+    views/                        # Overview / Usage / Prediction / National* 等页面
+  index.html
+  styles.css                      # 全局暗色科技风样式
+  package.json
+  vite.config.js
+
+data/official/
+  national_electricity_consumption_monthly_nea.csv
+
+docs/
+  data_schema.md                  # 国家数据字段说明
+  official_data_sources.md        # 官方数据来源说明
 
 scripts/
   migrate_sqlite_to_postgres.py   # SQLite 迁移到 PostgreSQL 的一次性脚本
 
-requirements.txt         # 后端依赖
+requirements.txt
 ```
-
-## 数据库配置
-
-默认情况下，项目使用仓库根目录下的 `SQLite`：
-
-- `sqlite:///./household_power.db`
-
-如果你想把用户、历史用电、预测记录、模型配置、历史对话等信息放到 `PostgreSQL`，只需要在启动前设置 `DATABASE_URL`：
-
-```powershell
-$env:DATABASE_URL = "postgresql://postgres:password@127.0.0.1:5432/household_power"
-```
-
-程序会自动把它规范化成 `SQLAlchemy + psycopg` 所需的连接形式，不需要你手动写驱动前缀。
-
-启动后可通过健康检查确认当前数据库后端：
-
-```text
-GET /health
-```
-
-返回里会包含：
-
-- `database_backend: sqlite`
-- 或 `database_backend: postgresql`
 
 ## 运行环境
 
@@ -94,16 +85,11 @@ GET /health
 - Node.js `18+`
 - npm `9+`
 
-如果你是 Windows + PowerShell，建议直接使用文档里的 `python.exe` 和 `npm.cmd` 命令，避免执行策略问题。
+如果你是 Windows + PowerShell，建议使用文档里的 `python.exe` 和 `npm.cmd` 命令，避免执行策略问题。
 
 ## 快速开始
 
-第一次拉取仓库后，必须做两件事：
-
-1. 安装后端依赖
-2. 安装并构建前端
-
-因为后端会直接服务 `frontend/dist`，如果你没有先构建前端，打开首页时会看到前端构建缺失提示。
+第一次拉取仓库后，需要先安装后端依赖、安装前端依赖并构建前端。后端会直接服务 `frontend/dist`，如果没有构建前端，访问首页会看到构建缺失提示。
 
 ### 1. 克隆仓库
 
@@ -114,14 +100,12 @@ cd PowerModel
 
 ### 2. 创建 Python 虚拟环境
 
-Windows:
-
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 ```
 
-如果你本机有多个 Python，也可以显式指定：
+如果本机有多个 Python，也可以显式指定：
 
 ```powershell
 C:\Users\YourName\AppData\Local\Programs\Python\Python312\python.exe -m venv .venv
@@ -140,28 +124,16 @@ C:\Users\YourName\AppData\Local\Programs\Python\Python312\python.exe -m venv .ve
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
 ```
 
-### 4. 安装前端依赖
+### 4. 安装并构建前端
 
 ```powershell
 cd frontend
 npm.cmd install --registry=https://registry.npmmirror.com --no-audit --no-fund
-cd ..
-```
-
-### 5. 构建前端
-
-```powershell
-cd frontend
 npm.cmd run build
 cd ..
 ```
 
-构建成功后会生成：
-
-- `frontend/dist/index.html`
-- `frontend/dist/assets/...`
-
-### 6. 启动后端
+### 5. 启动后端
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
@@ -173,57 +145,149 @@ cd ..
 - 健康检查：`http://127.0.0.1:8000/health`
 - Swagger 文档：`http://127.0.0.1:8000/docs`
 
-## 推荐的首次演示流程
+## 本地开发模式
 
-第一次打开页面，建议按这个顺序操作：
+### 方式一：只跑后端，使用构建后的前端
 
-1. 进入 `家庭画像`
-2. 创建一个家庭用户
-3. 进入 `历史用电`
-4. 点击 `填充示例`，或者导入你自己的 CSV
-5. 点击 `上传记录`
-6. 进入 `预测与建议`
-7. 点击 `运行预测`
-8. 如果你有自己的大模型 API，再进入 `模型设置` 测试并保存
-9. 回到 `预测与建议` 点击 `重新生成建议`
-10. 最后到 `情景模拟` 和 `智能问答` 继续演示，其中 `智能问答` 左侧可回看历史记录，右侧继续新问题
+适合演示和最终检查。
 
-## 如何接入你自己的大模型
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
 
-这个项目支持用户自行填写模型配置，但要求接口兼容 OpenAI 的 `chat/completions`。
+访问：
 
-在前端 `模型设置` 页面填写：
+```text
+http://127.0.0.1:8000/
+```
 
-- `provider`: 固定用 `openai-compatible`
+### 方式二：前后端分离开发
+
+终端 1，启动后端：
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+终端 2，启动 Vite：
+
+```powershell
+cd frontend
+npm.cmd run dev
+```
+
+访问：
+
+```text
+http://127.0.0.1:5173/
+```
+
+`frontend/vite.config.js` 已配置接口代理，前端会自动转发到本地 `8000` 后端。
+
+## 数据库配置
+
+默认使用仓库根目录下的 SQLite：
+
+```text
+sqlite:///./household_power.db
+```
+
+如需改用 PostgreSQL，在启动前设置 `DATABASE_URL`：
+
+```powershell
+$env:DATABASE_URL = "postgresql://postgres:password@127.0.0.1:5432/household_power"
+```
+
+启动后可以通过健康检查确认当前数据库后端：
+
+```text
+GET /health
+```
+
+返回中会包含：
+
+- `database_backend: sqlite`
+- 或 `database_backend: postgresql`
+
+当前数据库会保存：
+
+- 家庭用户画像
+- 家庭历史用电记录
+- 家庭预测记录
+- 聊天记录
+- 平台级模型配置
+
+如果已有 SQLite 数据需要迁移到 PostgreSQL：
+
+```powershell
+$env:DATABASE_URL = "postgresql://postgres:password@127.0.0.1:5432/household_power"
+.\.venv\Scripts\python.exe scripts\migrate_sqlite_to_postgres.py
+```
+
+如源 SQLite 不在默认位置，可额外指定：
+
+```powershell
+$env:SOURCE_DATABASE_URL = "sqlite:///./household_power.db"
+```
+
+## 推荐演示流程
+
+### 家庭模块
+
+1. 进入 `家庭画像`，创建一个家庭用户。
+2. 进入 `历史用电`，点击 `填充示例` 或导入 CSV。
+3. 点击 `上传记录`。
+4. 进入 `预测与建议`，点击 `运行预测`。
+5. 如有模型 API，进入 `模型设置`，测试并保存平台模型配置。
+6. 回到 `预测与建议`，点击 `重新生成建议`。
+7. 进入 `情景模拟` 和 `智能问答` 继续演示。
+
+### 国家模块
+
+1. 进入 `国家预测总览`。
+2. 选择 `官方数据` 或上传同结构 CSV。
+3. 设置预测月份数，范围为 `6-12`。
+4. 点击 `运行国家预测`。
+5. 查看历史趋势、预测区间、季节性分布和预测结果表。
+6. 进入 `国家分析报告`，查看本地规则报告，也可以使用平台模型进行润色。
+7. 进入 `国家数据来源`，查看字段说明、官方来源、原始数据和清洗后数据预览。
+
+## 平台模型配置
+
+项目使用平台级 OpenAI 兼容模型配置，家庭模块和国家模块都会复用这份配置。
+
+在 `模型设置` 页面填写：
+
+- `provider`: 默认 `openai-compatible`
 - `base_url`: 例如 `https://api.openai.com/v1`
 - `api_key`
-- `model_name`: 例如 `gpt-4o-mini`
+- `model_name`: 服务端实际暴露的模型标识
 - `temperature`
+
+页面内置常用服务预设：
+
+- 智谱 GLM
+- DeepSeek
+- Gemini OpenAI-compatible
+- OpenAI
+- 自定义
 
 推荐流程：
 
-1. 先点击 `测试连接`
-2. 测试成功后再点击 `保存配置`
-3. 回到 `预测与建议` 或 `智能问答` 查看效果
+1. 选择服务预设或自定义 Base URL。
+2. 点击 `测试连接`。
+3. 如需验证国家问答负载，点击 `诊断真实问答`。
+4. 测试成功后点击 `保存配置`。
 
-### 支持示例
+注意：
 
-- OpenAI
-- DeepSeek OpenAI-compatible 接口
-- 智谱/通义等兼容 OpenAI 协议的代理层
-- 自建本地兼容服务
+- API Key 会保存在当前启用的数据库中。
+- 接口返回配置时只会显示掩码，不会回显完整 Key。
+- 这是课程/原型项目，不适合直接作为生产级密钥管理方案。
 
-### 注意事项
-
-- 当前版本会把用户填写的模型配置保存在当前启用的数据库中
-- `GET /llm/config/{user_id}` 返回时会掩码显示 API Key
-- 这是课程/原型项目，不适合直接作为生产级密钥管理方案
-
-## 历史用电数据格式
+## 家庭历史用电 CSV 格式
 
 页面支持手工录入，也支持导入 CSV。
-
-CSV 表头格式：
 
 ```csv
 usage_month,power_kwh,bill_amount,avg_temperature,holiday_count
@@ -234,88 +298,39 @@ usage_month,power_kwh,bill_amount,avg_temperature,holiday_count
 
 字段说明：
 
-- `usage_month`: 月份，格式必须是 `YYYY-MM`
+- `usage_month`: 月份，格式为 `YYYY-MM`
 - `power_kwh`: 月度用电量，必填
 - `bill_amount`: 月电费，可选
 - `avg_temperature`: 平均温度，可选
 - `holiday_count`: 节假日天数，可选
 
-## 本地开发模式
+## 国家数据 CSV 格式
 
-### 方式一：只跑后端，使用构建后的前端
-
-这是最简单、最适合演示的方式。
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
-```
-
-然后访问：
+国家模块默认使用：
 
 ```text
-http://127.0.0.1:8000/
+data/official/national_electricity_consumption_monthly_nea.csv
 ```
 
-### 方式二：前后端分离开发
+上传 CSV 至少需要包含：
 
-如果你要改 React 页面，建议用 Vite 开发模式。
+- `date`
+- `consumption_billion_kwh`
 
-终端 1，启动后端：
+可选字段：
 
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
-```
+- `source`
+- `source_url`
+- `note`
 
-终端 2，启动前端开发服务器：
+字段说明和官方来源文档见：
 
-```powershell
-cd frontend
-npm.cmd run dev
-```
-
-然后访问：
-
-```text
-http://127.0.0.1:5173/
-```
-
-`vite.config.js` 里已经配置了接口代理，前端会自动转发到本地 `8000` 后端。
-
-## 数据与存储
-
-如果你使用默认配置，项目运行后会在根目录自动生成本地数据库：
-
-- `household_power.db`
-
-当前启用的数据库会保存：
-
-- 用户画像
-- 历史用电记录
-- 预测记录
-- 聊天记录
-- 模型配置
-
-如果你已经有一份现成的 `SQLite` 数据，想迁移到 `PostgreSQL`，可以使用仓库里的脚本：
-
-```powershell
-$env:DATABASE_URL = "postgresql://postgres:password@127.0.0.1:5432/household_power"
-.\.venv\Scripts\python.exe scripts\migrate_sqlite_to_postgres.py
-```
-
-如果源 SQLite 文件不在默认位置，可以额外指定：
-
-```powershell
-$env:SOURCE_DATABASE_URL = "sqlite:///./household_power.db"
-```
-
-注意：
-
-- 迁移脚本会把已有聊天历史一并复制到新库
-- 但如果旧记录本身已经是 `????`，迁移后仍然会是 `????`，因为原始中文在写入旧记录时就已经丢失了
+- `docs/data_schema.md`
+- `docs/official_data_sources.md`
 
 ## 主要接口
 
-核心接口如下：
+### 家庭与平台接口
 
 1. `POST /users/create`
 2. `GET /users/{user_id}`
@@ -328,11 +343,28 @@ $env:SOURCE_DATABASE_URL = "sqlite:///./household_power.db"
 9. `GET /chat/{user_id}`
 10. `POST /scenario/simulate`
 11. `POST /llm/test`
-12. `POST /llm/config`
-13. `GET /llm/config/{user_id}`
-14. `DELETE /llm/config/{user_id}`
+12. `POST /llm/test/diagnostic`
+13. `POST /llm/config`
+14. `GET /llm/config`
+15. `DELETE /llm/config`
+16. `POST /llm/config/user`
+17. `GET /llm/config/user/{user_id}`
+18. `DELETE /llm/config/user/{user_id}`
 
-更详细的请求/响应可以直接看：
+### 国家模块接口
+
+1. `GET /api/national/meta`
+2. `GET /api/national/datasets/default`
+3. `POST /api/national/datasets/validate`
+4. `POST /api/national/forecast/run`
+5. `POST /api/national/report/polish`
+6. `POST /api/national/qa`
+7. `POST /api/national/llm/test`
+8. `POST /api/national/llm/config`
+9. `GET /api/national/llm/config`
+10. `DELETE /api/national/llm/config`
+
+更详细的请求和响应可以查看：
 
 - `http://127.0.0.1:8000/docs`
 
@@ -352,7 +384,7 @@ POST /users/create
 }
 ```
 
-### 上传历史用电
+### 上传家庭历史用电
 
 ```json
 POST /usage/upload
@@ -365,31 +397,16 @@ POST /usage/upload
       "bill_amount": 105.3,
       "avg_temperature": 18,
       "holiday_count": 3
-    },
-    {
-      "usage_month": "2025-11",
-      "power_kwh": 201,
-      "bill_amount": 112.6,
-      "avg_temperature": 14,
-      "holiday_count": 2
-    },
-    {
-      "usage_month": "2025-12",
-      "power_kwh": 235,
-      "bill_amount": 131.6,
-      "avg_temperature": 8,
-      "holiday_count": 2
     }
   ]
 }
 ```
 
-### 配置模型
+### 配置平台模型
 
 ```json
 POST /llm/config
 {
-  "user_id": 1,
   "provider": "openai-compatible",
   "base_url": "https://api.openai.com/v1",
   "api_key": "sk-***",
@@ -399,7 +416,7 @@ POST /llm/config
 }
 ```
 
-### 执行预测
+### 执行家庭预测
 
 ```json
 POST /predict/monthly
@@ -409,21 +426,49 @@ POST /predict/monthly
 }
 ```
 
-### 智能问答
+### 运行国家预测
 
 ```json
-POST /chat
+POST /api/national/forecast/run
 {
-  "user_id": 1,
-  "question": "为什么我下个月的用电量会上升？"
+  "dataset_source": "default",
+  "forecast_periods": 12
 }
 ```
 
+### 国家智能问答
+
+```json
+POST /api/national/qa
+{
+  "question": "未来一年哪几个月可能出现高峰？",
+  "history": [],
+  "forecast": [],
+  "stats": {
+    "record_count": 0,
+    "history_start": "",
+    "history_end": "",
+    "latest_month": "",
+    "latest_value": 0,
+    "average_value": 0,
+    "max_value": 0,
+    "min_value": 0,
+    "max_month": "",
+    "min_month": "",
+    "seasonal_peak_months": [],
+    "seasonal_low_months": []
+  },
+  "qa_mode": "cloud_rewrite"
+}
+```
+
+实际使用时，前端会自动把当前国家预测结果中的 `history / forecast / stats` 传入问答接口。
+
 ## 常见问题
 
-### 1. 打开 `http://127.0.0.1:8000/` 显示前端构建缺失
+### 1. 打开首页显示前端构建缺失
 
-说明你还没有执行：
+说明还没有构建前端：
 
 ```powershell
 cd frontend
@@ -434,7 +479,7 @@ cd ..
 
 ### 2. 前端样式或页面没有更新
 
-先重新构建：
+重新构建前端并强制刷新浏览器：
 
 ```powershell
 cd frontend
@@ -442,7 +487,7 @@ npm.cmd run build
 cd ..
 ```
 
-然后浏览器强制刷新：
+浏览器中执行：
 
 ```text
 Ctrl + F5
@@ -450,7 +495,7 @@ Ctrl + F5
 
 ### 3. PowerShell 下 `npm` 无法执行
 
-有些机器会遇到执行策略限制，直接改用：
+使用 `npm.cmd`：
 
 ```powershell
 npm.cmd install
@@ -458,55 +503,56 @@ npm.cmd run build
 npm.cmd run dev
 ```
 
-### 4. 问答或建议没有走大模型
+### 4. 问答、建议或报告没有走大模型
 
-这是正常的降级行为。常见原因：
+这是正常降级行为。常见原因：
 
 - `base_url` 不正确
 - `api_key` 无效
-- 模型名不正确
+- `model_name` 不正确
 - 外部接口超时或不可达
+- 当前没有保存平台级模型配置
 
-项目会自动回退到规则版，不会让主流程中断。
+项目会自动回退到本地规则逻辑，不会让主流程中断。
 
 ### 5. 历史问答里出现 `????`
 
-这通常不是 `SQLite` 本身不支持中文，而是某次输入链路在写入数据库之前就已经把文本损坏成了问号。
+通常不是 SQLite 不支持中文，而是输入链路在写入数据库前已经把文本损坏成问号。
 
-当前版本已经做了两层保护：
+当前版本做了两层保护：
 
-- 前端会拦截“全是问号”的异常问题输入
-- 后端 `ChatRequest` 校验也会拒绝只包含占位问号的内容
+- 前端会拦截“全是问号”的异常问题输入。
+- 后端 `ChatRequest` 校验会拒绝只包含占位问号的内容。
 
-如果旧记录已经写成 `????`，迁移到 `PostgreSQL` 后也不会自动恢复，因为原始文本已经丢失。
+如果旧记录已经写成 `????`，迁移到 PostgreSQL 后也不会自动恢复。
 
-### 6. 预测时报错 “At least 3 months of usage data are required for prediction”
+### 6. 家庭预测提示至少需要 3 个月历史数据
 
-当前版本至少需要 `3` 个月的历史数据才能执行预测。
+家庭模块至少需要 `3` 个月历史数据才能执行预测。
 
-### 7. 为什么预测不是 LightGBM / XGBoost？
+### 7. 国家预测上传 CSV 校验失败
 
-当前仓库里的预测模块还是规则版 MVP，目的是先把产品链路跑通：
+请确认 CSV 至少包含：
 
-- 数据录入
-- 预测结果
-- 大模型解释
-- 建议生成
-- 问答交互
+- `date`
+- `consumption_billion_kwh`
 
-如果你后续要继续升级，优先改这个文件：
+并且日期、数值格式可被 pandas 正确解析。
 
-- `app/services/predictor.py`
+### 8. 国家预测为什么使用 SARIMA？
+
+国家模块是月度时间序列预测场景，当前版本使用 `SARIMA` 保持解释性和可演示性，并输出预测区间、季节性分析和本地规则报告。
 
 ## 后续可扩展方向
 
-- 把规则预测替换成 `LightGBM / XGBoost`
-- 增加日级或小时级用电预测
-- 支持峰谷电价分析
-- 增加导出 PDF/报告功能
-- 接入真实电表或账单数据
-- 加入异常用电预警
+- 将家庭规则预测升级为 `LightGBM / XGBoost`。
+- 增加日级或小时级用电预测。
+- 支持峰谷电价分析。
+- 增加 PDF/Markdown 报告导出。
+- 接入真实电表、账单或更多官方宏观数据。
+- 增加异常用电预警。
+- 增加用户级权限、密钥加密和生产级配置管理。
 
 ## 许可证
 
-当前仓库未单独声明开源许可证。如果你打算公开长期维护，建议补充 `LICENSE` 文件。
+当前仓库未单独声明开源许可证。如果打算公开长期维护，建议补充 `LICENSE` 文件。
