@@ -86,7 +86,7 @@ class NationalForecastRunRequest(BaseModel):
 class NationalPolishReportRequest(BaseModel):
     draft_report: str = Field(min_length=1)
     context: dict[str, Any] = Field(default_factory=dict)
-    llm_config: NationalLLMConfigPayload
+    llm_config: NationalLLMConfigPayload | None = None
 
 
 class NationalQARequest(BaseModel):
@@ -94,9 +94,9 @@ class NationalQARequest(BaseModel):
     history: list[NationalHistoryPoint]
     forecast: list[NationalForecastPoint]
     stats: NationalStatsSummary
+    qa_mode: Literal["local", "cloud_rewrite", "cloud_direct"] = "cloud_rewrite"
     llm_config: NationalLLMConfigPayload | None = None
 
 
 class NationalLLMTestRequest(BaseModel):
     llm_config: NationalLLMConfigPayload
-

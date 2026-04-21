@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import Any
+from typing import Literal
 
 import requests
 
@@ -17,7 +18,7 @@ class LLMConfig:
     base_url: str = ""
     model: str = ""
     provider: str = "OpenAI-Compatible"
-    timeout_seconds: int = 45
+    timeout_seconds: int = 90
 
 
 class LLMClient:
@@ -84,38 +85,51 @@ class LLMClient:
     def answer_question(
         self,
         question: str,
-        rule_based_answer: str,
         history_context: str,
         forecast_context: str,
+        rule_based_answer: str | None = None,
+        answer_mode: Literal["cloud_rewrite", "cloud_direct"] = "cloud_rewrite",
     ) -> str:
         self.last_answer_error = None
         self.last_answer_used_cloud = False
 
         if not self.is_ready:
-            return rule_based_answer
+            return rule_based_answer or "云端模型当前不可用，且没有可回退的本地答案。"
 
-        user_prompt = (
-            "请根据给定的历史数据摘要、未来预测结果和已有规则答案，"
-            "回答用户关于全国全社会用电量趋势的问题。"
-            "要求：1）中文回答；2）优先保留已有规则答案中的核心数值；"
-            "3）如果上下文不足，不要编造。\n\n"
-            f"用户问题：{question}\n\n"
-            f"历史数据摘要：\n{history_context}\n\n"
-            f"预测结果摘要：\n{forecast_context}\n\n"
-            f"规则答案：\n{rule_based_answer}"
-        )
+        if answer_mode == "cloud_direct":
+            system_prompt = "你是一名严谨的电力行业问答助手，只能基于提供的上下文独立回答问题，不要引用不存在的数据。"
+            user_prompt = (
+                "请仅根据给定的历史数据摘要和未来预测结果，独立回答用户关于全国全社会用电量趋势的问题。"
+                "要求：1）中文回答；2）主动组织结构，让回答比模板化规则答案更自然；"
+                "3）明确引用关键月份、区间或趋势；4）如果上下文不足，不要编造。\n\n"
+                f"用户问题：{question}\n\n"
+                f"历史数据摘要：\n{history_context}\n\n"
+                f"预测结果摘要：\n{forecast_context}"
+            )
+        else:
+            system_prompt = "你是一名严谨的电力行业问答助手，只能基于提供的上下文回答问题。"
+            user_prompt = (
+                "请根据给定的历史数据摘要、未来预测结果和已有规则答案，"
+                "对规则答案进行润色增强后再回答用户。"
+                "要求：1）中文回答；2）优先保留已有规则答案中的核心数值；"
+                "3）可以补充更自然的解释，但不要编造。\n\n"
+                f"用户问题：{question}\n\n"
+                f"历史数据摘要：\n{history_context}\n\n"
+                f"预测结果摘要：\n{forecast_context}\n\n"
+                f"规则答案：\n{rule_based_answer or ''}"
+            )
 
         try:
             result = self._chat(
-                system_prompt="你是一名严谨的电力行业问答助手，只能基于提供的上下文回答问题。",
+                system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                temperature=0.2,
+                temperature=0.45 if answer_mode == "cloud_direct" else 0.25,
             )
             self.last_answer_used_cloud = True
             return result
         except LLMClientError as exc:
             self.last_answer_error = str(exc)
-            return rule_based_answer
+            return rule_based_answer or "云端模型调用失败，且当前没有可回退的本地答案。"
 
     def test_connection(self) -> tuple[bool, str]:
         if not self.is_configured:
@@ -142,10 +156,7 @@ class LLMClient:
             temperature=temperature,
         )
 
-        try:
-            return data["choices"][0]["message"]["content"].strip()
-        except (KeyError, IndexError, TypeError) as exc:
-            raise LLMClientError("云端模型返回格式无法识别。") from exc
+        return _extract_text_content(data)
 
     def _request_chat_completion(
         self,
@@ -161,7 +172,10 @@ class LLMClient:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": temperature,
+            "max_tokens": 900,
         }
+        if _should_disable_thinking(self.config):
+            payload["thinking"] = {"type": "disabled"}
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
@@ -215,6 +229,52 @@ class LLMClient:
         if normalized == "https://api.deepseek.com":
             return f"{normalized}/chat/completions"
         return f"{normalized}/v1/chat/completions"
+
+
+def _should_disable_thinking(config: LLMConfig) -> bool:
+    model_name = config.model.lower()
+    base_url = config.base_url.lower()
+    return model_name.startswith("glm-4.7") or ("bigmodel.cn" in base_url and model_name.startswith("glm-"))
+
+
+def _extract_text_content(response_body: Any) -> str:
+    if not isinstance(response_body, dict):
+        raise LLMClientError("云端模型返回格式无法识别。")
+
+    choices = response_body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise LLMClientError("云端模型返回内容为空，没有拿到可用回答。")
+
+    choice = choices[0] if isinstance(choices[0], dict) else {}
+    message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+    content = message.get("content")
+
+    if isinstance(content, str):
+        text = content.strip()
+        if text:
+            return text
+
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
+                parts.append(str(item["text"]))
+        text = "\n".join(parts).strip()
+        if text:
+            return text
+
+    reasoning_content = message.get("reasoning_content")
+    if reasoning_content:
+        finish_reason = choice.get("finish_reason")
+        if finish_reason == "length":
+            raise LLMClientError("云端模型把输出额度耗在了推理过程上，没有返回最终答案。")
+        raise LLMClientError("云端模型返回了推理内容，但没有最终答案。")
+
+    text = choice.get("text")
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+
+    raise LLMClientError("云端模型返回格式无法识别。")
 
 
 def _extract_error_message(response_body: Any) -> str:

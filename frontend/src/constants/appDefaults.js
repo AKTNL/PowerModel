@@ -15,6 +15,7 @@ export const DEFAULT_PROFILE_FORM = {
 };
 
 export const DEFAULT_MODEL_FORM = {
+  service_preset: "custom",
   provider: "openai-compatible",
   base_url: "",
   api_key: "",

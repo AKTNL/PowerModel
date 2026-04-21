@@ -9,6 +9,10 @@ import {
   STORAGE_KEYS
 } from "../constants/appDefaults.js";
 import {
+  getPresetByKey,
+  inferPresetKeyFromConfig
+} from "../constants/modelCatalog.js";
+import {
   VIEW_META,
   analyzeDraftRows,
   createDraftRow,
@@ -32,6 +36,7 @@ import {
 import {
   clearLlmConfig,
   createUser,
+  diagnoseLlmConfig,
   fetchChatHistory,
   fetchLatestPrediction,
   fetchLlmConfig,
@@ -85,6 +90,10 @@ export function useHouseholdPowerApp() {
   const [latestPredictionMeta, setLatestPredictionMeta] = useState(null);
   const [targetMonth, setTargetMonth] = useState("");
   const [llmPreview, setLlmPreview] = useState(DEFAULT_LLM_PREVIEW);
+  const [isTestingLlm, setIsTestingLlm] = useState(false);
+  const [isDiagnosingLlm, setIsDiagnosingLlm] = useState(false);
+  const [isSavingLlm, setIsSavingLlm] = useState(false);
+  const [isClearingLlm, setIsClearingLlm] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatError, setChatError] = useState("");
@@ -163,7 +172,9 @@ export function useHouseholdPowerApp() {
 
   function applyLoadedLlmConfig(config) {
     setLlmConfig(config);
+    const presetKey = inferPresetKeyFromConfig(config);
     setModelForm({
+      service_preset: presetKey,
       provider: config.provider || "openai-compatible",
       base_url: config.base_url || "",
       api_key: "",
@@ -183,6 +194,17 @@ export function useHouseholdPowerApp() {
       tone: "muted",
       text: "当前还没有保存平台级模型配置。"
     });
+  }
+
+  function buildLlmDraftPayload() {
+    return {
+      provider: modelForm.provider,
+      base_url: normalizeValue(modelForm.base_url),
+      api_key: normalizeValue(modelForm.api_key),
+      model_name: normalizeValue(modelForm.model_name),
+      temperature: normalizeNumber(modelForm.temperature) ?? 0.3,
+      enabled: true
+    };
   }
 
   useEffect(() => {
@@ -331,7 +353,21 @@ export function useHouseholdPowerApp() {
 
   function handleModelChange(event) {
     const { name, value } = event.target;
-    setModelForm((current) => ({ ...current, [name]: value }));
+    if (name === "service_preset") {
+      const preset = getPresetByKey(value);
+      setModelForm((current) => ({
+        ...current,
+        service_preset: preset.key,
+        base_url: preset.key === "custom" ? "" : preset.baseUrl
+      }));
+      return;
+    }
+
+    setModelForm((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === "base_url" ? { service_preset: "custom" } : {})
+    }));
   }
 
   function handleScenarioChange(event) {
@@ -377,53 +413,143 @@ export function useHouseholdPowerApp() {
   }
 
   async function handleTestLlm() {
-    const response = await testLlmConfig({
-      provider: modelForm.provider,
-      base_url: normalizeValue(modelForm.base_url),
-      api_key: normalizeValue(modelForm.api_key),
-      model_name: normalizeValue(modelForm.model_name),
-      temperature: normalizeNumber(modelForm.temperature) ?? 0.3,
-      enabled: true,
-      prompt: "Reply with OK only."
+    setIsTestingLlm(true);
+    setLlmPreview({
+      tone: "muted",
+      text: "正在测试当前模型配置，请稍候..."
     });
 
+    try {
+      const response = await testLlmConfig({
+        ...buildLlmDraftPayload(),
+        prompt: "Reply with OK only."
+      });
+
+      setLlmPreview({
+        tone: "success",
+        text: `连接成功，返回预览：${response.data.preview}`
+      });
+      showToast("模型连接测试成功");
+    } catch (error) {
+      setLlmPreview({
+        tone: "error",
+        text: error.message || "模型连接测试失败，请检查地址、Key 和模型名称。"
+      });
+      throw error;
+    } finally {
+      setIsTestingLlm(false);
+    }
+  }
+
+  function buildLlmDiagnosticHint(message) {
+    if (!message) {
+      return "";
+    }
+
+    if (message.includes("调用超时")) {
+      return "诊断判断：更像是请求能发出去，但真实问答耗时过长。优先检查网络延迟、代理链路、服务拥塞，或模型首包是否过慢。";
+    }
+    if (message.includes("HTTP 429")) {
+      return "诊断判断：更像是额度或速率限制，不是单纯网络断连。";
+    }
+    if (message.includes("HTTP 401") || message.includes("HTTP 403")) {
+      return "诊断判断：更像是 API Key 无效、权限不足，或服务端拒绝当前凭据。";
+    }
+    if (message.includes("HTTP 404")) {
+      return "诊断判断：更像是 Base URL、接口路径或模型名称配置不正确。";
+    }
+    if (message.includes("返回格式无法识别") || message.includes("没有最终答案")) {
+      return "诊断判断：更像是模型返回格式与当前 OpenAI 兼容接口存在差异，或模型启用了推理模式但没有给出最终答案。";
+    }
+    return "诊断判断：建议优先核对服务状态、网关稳定性，以及该模型对 OpenAI 兼容接口的返回格式。";
+  }
+
+  async function handleDiagnoseLlm() {
+    setIsDiagnosingLlm(true);
     setLlmPreview({
-      tone: "success",
-      text: `连接成功，返回预览：${response.data.preview}`
+      tone: "muted",
+      text: "正在用接近国家独立问答的真实负载做诊断，请稍候..."
     });
-    showToast("模型连接测试成功");
+
+    try {
+      const response = await diagnoseLlmConfig({
+        ...buildLlmDraftPayload(),
+        prompt: "未来一年全国全社会用电量趋势如何？"
+      });
+
+      setLlmPreview({
+        tone: "success",
+        text: `真实问答诊断通过，${response.data.timeout_seconds}s 超时阈值内已返回内容：${response.data.preview}`
+      });
+      showToast("真实问答诊断通过");
+    } catch (error) {
+      const reason = error.message || "真实问答诊断失败，请稍后重试。";
+      const hint = buildLlmDiagnosticHint(reason);
+      setLlmPreview({
+        tone: "error",
+        text: hint ? `${reason}\n\n${hint}` : reason
+      });
+      throw error;
+    } finally {
+      setIsDiagnosingLlm(false);
+    }
   }
 
   async function handleSaveLlm() {
-    const response = await saveLlmConfig({
-      provider: modelForm.provider,
-      base_url: normalizeValue(modelForm.base_url),
-      api_key: normalizeValue(modelForm.api_key),
-      model_name: normalizeValue(modelForm.model_name),
-      temperature: normalizeNumber(modelForm.temperature) ?? 0.3,
-      enabled: true
+    setIsSavingLlm(true);
+    setLlmPreview({
+      tone: "muted",
+      text: "正在保存平台模型配置，请稍候..."
     });
 
-    applyLoadedLlmConfig(response.data.config);
-    setModelForm((current) => ({ ...current, api_key: "" }));
-    setLlmPreview({
-      tone: "success",
-      text: `已保存平台配置：${response.data.config.model_name} @ ${response.data.config.base_url}`
-    });
-    setChatError("");
-    showToast("平台模型配置已保存");
+    try {
+      const response = await saveLlmConfig(buildLlmDraftPayload());
+
+      applyLoadedLlmConfig(response.data.config);
+      setModelForm((current) => ({ ...current, api_key: "" }));
+      setLlmPreview({
+        tone: "success",
+        text: `已保存平台配置：${response.data.config.model_name} @ ${response.data.config.base_url}`
+      });
+      setChatError("");
+      showToast("平台模型配置已保存");
+    } catch (error) {
+      setLlmPreview({
+        tone: "error",
+        text: error.message || "保存平台模型配置失败，请稍后重试。"
+      });
+      throw error;
+    } finally {
+      setIsSavingLlm(false);
+    }
   }
 
   async function handleClearLlm() {
-    await clearLlmConfig();
-    setLlmConfig(null);
-    setModelForm(DEFAULT_MODEL_FORM);
+    setIsClearingLlm(true);
     setLlmPreview({
       tone: "muted",
-      text: "已清除平台级模型配置。"
+      text: "正在清除平台模型配置，请稍候..."
     });
-    setChatError("");
-    showToast("平台模型配置已清除");
+
+    try {
+      await clearLlmConfig();
+      setLlmConfig(null);
+      setModelForm(DEFAULT_MODEL_FORM);
+      setLlmPreview({
+        tone: "muted",
+        text: "已清除平台级模型配置。"
+      });
+      setChatError("");
+      showToast("平台模型配置已清除");
+    } catch (error) {
+      setLlmPreview({
+        tone: "error",
+        text: error.message || "清除平台模型配置失败，请稍后重试。"
+      });
+      throw error;
+    } finally {
+      setIsClearingLlm(false);
+    }
   }
 
   async function handleRefreshUsage() {
@@ -655,9 +781,14 @@ export function useHouseholdPowerApp() {
         modelForm,
         onChange: handleModelChange,
         onTest: () => runSafely(handleTestLlm),
+        onDiagnose: () => runSafely(handleDiagnoseLlm),
         onSave: () => runSafely(handleSaveLlm),
         onClear: () => runSafely(handleClearLlm),
         llmPreview,
+        isTestingLlm,
+        isDiagnosingLlm,
+        isSavingLlm,
+        isClearingLlm,
         llmConfig
       },
       usage: {

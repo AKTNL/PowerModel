@@ -35,27 +35,3 @@ export function askNationalQuestion(payload) {
     body: JSON.stringify(payload)
   });
 }
-
-export function testNationalLlm(payload) {
-  return requestJson("/api/national/llm/test", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-}
-
-export function saveNationalLlmConfig(payload) {
-  return requestJson("/api/national/llm/config", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-}
-
-export function fetchNationalLlmConfig() {
-  return requestJson("/api/national/llm/config");
-}
-
-export function clearNationalLlmConfig() {
-  return requestJson("/api/national/llm/config", {
-    method: "DELETE"
-  });
-}

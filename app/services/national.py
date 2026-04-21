@@ -91,7 +91,7 @@ class NationalService:
 
         if llm_client.last_report_used_cloud:
             status = "cloud"
-            message = "本次报告已由云端大模型润色。"
+            message = "本次报告已由云端大模型润色，但底层结论仍基于当前 SARIMA 预测结果。"
         elif llm_client.last_report_error:
             status = "fallback_local"
             message = f"云端润色失败，已回退到本地规则报告：{llm_client.last_report_error}"
@@ -118,17 +118,28 @@ class NationalService:
             forecast_df=forecast_df,
             stats=stats,
             llm_client=llm_client,
+            answer_mode=payload.qa_mode,
         )
 
-        if llm_client.last_answer_used_cloud:
-            status = "cloud"
-            message = "本次问答由云端大模型生成。"
+        if payload.qa_mode == "local":
+            status = "local"
+            message = "当前使用的是本地规则回答，结论直接基于 SARIMA 预测结果。"
+        elif llm_client.last_answer_used_cloud and payload.qa_mode == "cloud_direct":
+            status = "cloud_direct"
+            message = "本次回答由云端大模型独立生成，依据的是当前 SARIMA 预测上下文，但未直接复述本地规则答案。"
+        elif llm_client.last_answer_used_cloud:
+            status = "cloud_rewrite"
+            message = "本次回答由云端大模型在本地规则答案基础上润色生成，依据的预测上下文仍来自当前 SARIMA 预测结果。"
         elif llm_client.last_answer_error:
             status = "fallback_local"
-            message = f"云端问答失败，已回退到本地规则回答：{llm_client.last_answer_error}"
+            prefix = "云端独立回答失败" if payload.qa_mode == "cloud_direct" else "云端润色回答失败"
+            message = f"{prefix}，已回退到本地规则回答：{llm_client.last_answer_error}"
         else:
             status = "local"
-            message = "当前使用的是本地规则回答。"
+            if payload.qa_mode == "cloud_direct":
+                message = "当前请求的是云端独立回答，但共享平台模型未就绪，已改用本地规则回答。"
+            else:
+                message = "当前请求的是云端润色回答，但共享平台模型未就绪，已改用本地规则回答。"
 
         return {
             "answer": answer,
@@ -217,9 +228,7 @@ class NationalService:
 
     def _build_llm_client(self, payload: NationalLLMConfigPayload | None) -> LLMClient:
         active_payload = payload
-        if active_payload is None or (
-            not active_payload.base_url and not active_payload.model and not active_payload.api_key and not active_payload.enabled
-        ):
+        if active_payload is None:
             global_config = get_global_llm_config(self.db)
             active_payload = self._global_config_to_payload(global_config)
         config = LLMConfig(

@@ -22,6 +22,13 @@ export function testLlmConfig(payload) {
   });
 }
 
+export function diagnoseLlmConfig(payload) {
+  return requestJson("/llm/test/diagnostic", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export function saveLlmConfig(payload) {
   return requestJson("/llm/config", {
     method: "POST",

@@ -21,20 +21,27 @@ export default function NationalOverviewView({
     <div className="module-view is-active" data-view="national-overview">
       <section className="hero-board">
         <div className="hero-content">
-          <p className="eyebrow">National Module</p>
+          <p className="eyebrow">国家模块</p>
           <h2 className="hero-title">国家用电预测总览</h2>
-          <p className="hero-copy">在当前家庭系统的框架里加入国家级月度用电预测，统一展示数据来源、预测区间、分析报告和问答工作台。</p>
+          <p className="hero-copy">在当前家庭系统的框架里接入国家级月度用电预测，统一展示数据来源、预测区间、分析报告与问答工作台。</p>
         </div>
         <div className="hero-side">
-          <button className="primary-button" type="button" onClick={onRunForecast} disabled={isBooting || isRunning}>
-            {isRunning ? "正在运行..." : "运行国家预测"}
-          </button>
+          <div className="signal-panel compact-panel">
+            <div className="signal-panel-head">
+              <span className="signal-dot" />
+              <span>运行操作</span>
+            </div>
+            <p className="hero-copy">选择数据来源和预测月份数后，即可在当前工作区直接运行国家预测。</p>
+            <button className="primary-button" type="button" onClick={onRunForecast} disabled={isBooting || isRunning}>
+              {isRunning ? "正在运行..." : "运行国家预测"}
+            </button>
+          </div>
         </div>
       </section>
 
-      <Panel kicker="Dataset" title="数据与参数" note="默认使用内置国家能源局公开数据，也支持上传同结构 CSV。">
+      <Panel kicker="数据设置" title="数据与参数" note="默认使用内置国家能源局公开数据，也支持上传同结构 CSV。">
         <div className="national-control-grid">
-          <div className="panel form-panel">
+          <div className="form-panel">
             <div className="toggle-row">
               <label className="toggle-option">
                 <input
@@ -95,7 +102,7 @@ export default function NationalOverviewView({
         </div>
       </Panel>
 
-      <Panel kicker="Charts" title="国家预测图表" note="保留国家模块的业务语义，但统一使用当前项目的卡片和大屏布局。">
+      <Panel kicker="趋势分析" title="国家预测图表" note="保留国家模块的业务语义，同时统一使用当前项目的图表容器和工作区布局。">
         <div className="usage-grid national-chart-grid">
           <NationalSeriesChart title="历史趋势" caption="历史用电量与 3 个月移动均值。" series={runResult.charts.history} />
           <NationalSeriesChart title="预测区间" caption="未来月份的预测值和上下界。" series={runResult.charts.forecast} />

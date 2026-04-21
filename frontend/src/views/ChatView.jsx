@@ -106,9 +106,9 @@ export default function ChatView({
         </section>
 
         <Panel
-          kicker="Chat"
+          kicker="Assistant"
           title="智能问答"
-          note="左侧快速回看历史记录，右侧继续当前提问、查看完整回复。"
+          note="左侧用于回看上下文，右侧聚焦当前提问与完整回答，保持分析过程连贯、安静且易读。"
           className="chat-main-panel"
         >
           <div className="page-intro-strip">
@@ -219,7 +219,7 @@ export default function ChatView({
           <div className="chat-prompt-notes">
             <article className="chat-note-card">
               <strong>尽量问具体问题</strong>
-              <p>例如“为什么比上个月高”或“空调每天少开 1 小时会怎样”，比泛泛提问更容易得到可执行回答。</p>
+              <p>例如“为什么比上个月高”或“空调每天少开 1 小时会怎样”，会比泛泛提问更容易得到可执行回答。</p>
             </article>
             <article className="chat-note-card">
               <strong>优先围绕当前预测追问</strong>

@@ -21,7 +21,7 @@ export default function UsageView({
   return (
     <div className="module-view is-active" data-view="usage">
       <Panel
-        kicker="Usage"
+        kicker="历史数据"
         title="历史用电"
         note="你可以直接录入月度数据，也可以从 Excel 导出成 CSV 后导入。上传时只会提交有效行。"
       >
@@ -156,7 +156,7 @@ export default function UsageView({
         </div>
       </Panel>
 
-      <Panel kicker="Trend" title="趋势图与最近记录" note="图表和列表都基于当前草稿中的有效记录实时更新。">
+      <Panel kicker="趋势视图" title="趋势图与最近记录" note="图表和列表都基于当前草稿中的有效记录实时更新。">
         <div className="usage-grid">
           <div className="usage-card">
             <div className="usage-card-head">

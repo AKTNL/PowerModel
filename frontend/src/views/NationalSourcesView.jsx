@@ -66,7 +66,7 @@ export default function NationalSourcesView({ meta, defaultDataset, runResult, u
 
   return (
     <div className="module-view is-active" data-view="national-sources">
-      <Panel kicker="Docs" title="国家数据来源与字段说明" note="保留国家模块的数据口径说明，方便你在答辩或演示时解释数据来源。">
+      <Panel kicker="来源文档" title="国家数据来源与字段说明" note="保留国家模块的数据口径说明，方便你在答辩或演示时解释数据来源。">
         <div className="insight-grid">
           <div className="insight-card markdown-panel">
             <div className="insight-head">
@@ -88,7 +88,7 @@ export default function NationalSourcesView({ meta, defaultDataset, runResult, u
         ) : null}
       </Panel>
 
-      <Panel kicker="Dataset" title="数据预览" note="默认展示清洗后数据和原始来源数据，各取前 24 行。">
+      <Panel kicker="数据预览" title="数据预览" note="默认展示清洗后数据和原始来源数据，各取前 24 行。">
         <div className="usage-grid national-source-grid">
           {renderTable(cleanRows, "清洗后数据")}
           {renderTable(rawRows, "原始来源数据")}

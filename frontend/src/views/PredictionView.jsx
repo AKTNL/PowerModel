@@ -14,24 +14,28 @@ export default function PredictionView({
   return (
     <div className="module-view is-active" data-view="prediction">
       <Panel
-        kicker="Prediction"
+        kicker="预测结果"
         title="预测与建议"
         note="先出预测结果，再把结果交给大模型生成解释与建议；如果模型不可用，会自动回退到规则版。"
         actions={
-          <div className="prediction-actions">
-            <label>
-              目标月份
+          <div className="prediction-actions prediction-toolbar">
+            <label className="form-field toolbar-field">
+              <span className="form-field-label">目标月份</span>
               <input type="month" value={targetMonth} onChange={onTargetMonthChange} />
+              <span className="form-field-hint">可留空，系统会按当前可推断的下一个月份运行预测。</span>
             </label>
-            <button type="button" className="primary-button" onClick={onRunPrediction}>
-              运行预测
-            </button>
-            <button type="button" className="ghost-button" onClick={onRefreshPrediction}>
-              刷新结果
-            </button>
-            <button type="button" className="ghost-button" onClick={onRegenerateAdvice}>
-              重新生成建议
-            </button>
+
+            <div className="toolbar-action-group">
+              <button type="button" className="primary-button" onClick={onRunPrediction}>
+                运行预测
+              </button>
+              <button type="button" className="ghost-button" onClick={onRefreshPrediction}>
+                刷新结果
+              </button>
+              <button type="button" className="ghost-button" onClick={onRegenerateAdvice}>
+                重新生成建议
+              </button>
+            </div>
           </div>
         }
       >
@@ -66,7 +70,7 @@ export default function PredictionView({
         {predictionMeta?.llm_error ? <div className="pill">LLM 调用失败，已自动回退到规则生成</div> : null}
       </Panel>
 
-      <Panel kicker="Insight" title="原因分析与节能建议" note="这里展示的是最近一次预测对应的解释文本和建议文本。">
+      <Panel kicker="分析说明" title="原因分析与节能建议" note="这里展示的是最近一次预测对应的解释文本和建议文本。">
         <div className="insight-grid">
           <div className="insight-card">
             <div className="insight-head">

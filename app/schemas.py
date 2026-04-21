@@ -124,6 +124,10 @@ class LLMConfigTestRequest(LLMConfigBase):
     prompt: str = Field(default="Reply with OK only.", min_length=2)
 
 
+class LLMConfigDiagnosticRequest(LLMConfigBase):
+    prompt: str = Field(default="未来一年全国全社会用电量趋势如何？", min_length=2)
+
+
 class LLMConfigRead(BaseModel):
     id: int
     user_id: int

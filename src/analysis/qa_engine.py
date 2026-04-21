@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import Literal
 
 import pandas as pd
 
@@ -18,21 +19,25 @@ class RuleBasedQAEngine:
         forecast_df: pd.DataFrame,
         stats: dict[str, Any],
         llm_client: LLMClient | None = None,
+        answer_mode: Literal["local", "cloud_rewrite", "cloud_direct"] = "cloud_rewrite",
     ) -> str:
         normalized = question.strip()
         if not normalized:
             return "请输入一个具体问题，例如“未来一年用电量趋势如何”。"
 
         rule_answer = self._build_rule_answer(normalized, history_df, forecast_df, stats)
+        if answer_mode == "local":
+            return rule_answer
 
         if llm_client and llm_client.is_ready:
             history_context = history_df.tail(12).to_csv(index=False)
             forecast_context = forecast_df.to_csv(index=False)
             return llm_client.answer_question(
                 question=normalized,
-                rule_based_answer=rule_answer,
                 history_context=history_context,
                 forecast_context=forecast_context,
+                rule_based_answer=rule_answer if answer_mode == "cloud_rewrite" else None,
+                answer_mode=answer_mode,
             )
 
         return rule_answer

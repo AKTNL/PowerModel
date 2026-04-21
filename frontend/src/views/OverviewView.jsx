@@ -56,10 +56,10 @@ export default function OverviewView({
     <div className="module-view is-active" data-view="overview">
       <section className="hero-board">
         <div className="hero-content">
-          <p className="eyebrow">Mission Control</p>
-          <h2 className="hero-title">家庭用电预测总览屏</h2>
+          <p className="eyebrow">Overview</p>
+          <h2 className="hero-title">家庭用电预测总览</h2>
           <p className="hero-copy">
-            用一个首页把用户状态、模型接入、历史数据和下月预测全部集中展示，适合答辩时直接讲业务闭环。
+            把用户状态、模型接入、历史数据和下月预测集中在同一个工作区里，让分析链路更清晰，也更适合演示完整业务闭环。
           </p>
 
           <div className="hero-metrics">
@@ -85,7 +85,7 @@ export default function OverviewView({
           <div className="signal-panel">
             <div className="signal-panel-head">
               <span className="signal-dot" />
-              <span>System Signals</span>
+              <span>运行信号</span>
             </div>
             <div className="signal-grid">
               {operationSignals.map((item) => (
@@ -101,9 +101,9 @@ export default function OverviewView({
       </section>
 
       <Panel
-        kicker="Live Trend"
+        kicker="Recent Trend"
         title="近 6 个月负荷走势"
-        note="这个区域做成首页主视觉，答辩时可以先讲趋势，再切到预测和建议模块。"
+        note="先看趋势，再进入预测与建议，信息节奏会更自然，也更容易理解模型在做什么。"
       >
         <div className="trend-stage">
           <div className="trend-chart-card">
@@ -165,9 +165,9 @@ export default function OverviewView({
       </Panel>
 
       <Panel
-        kicker="Dashboard"
+        kicker="Key Metrics"
         title="首页关键指标"
-        note="保留几张高密度卡片，用来快速解释当前系统的数据状态和模型状态。"
+        note="用简洁的关键指标概括当前系统的数据可用性、模型状态与预测结果。"
       >
         <div className="overview-grid">
           <article className="overview-card">

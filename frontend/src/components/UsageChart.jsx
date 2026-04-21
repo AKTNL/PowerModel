@@ -38,22 +38,22 @@ export default function UsageChart({ records }) {
     <svg id="usage-chart" viewBox="0 0 640 240" role="img" aria-label="历史用电趋势图">
       <defs>
         <linearGradient id="usage-fill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(111,210,207,0.38)" />
-          <stop offset="100%" stopColor="rgba(111,210,207,0.02)" />
+          <stop offset="0%" stopColor="rgba(115, 199, 255, 0.3)" />
+          <stop offset="100%" stopColor="rgba(115, 199, 255, 0.02)" />
         </linearGradient>
       </defs>
       <rect x="0" y="0" width="640" height="240" rx="18" fill="rgba(255,255,255,0.01)" />
-      <line x1="48" y1="32" x2="48" y2="208" stroke="rgba(169,188,199,0.16)" />
-      <line x1="48" y1="208" x2="592" y2="208" stroke="rgba(169,188,199,0.16)" />
+      <line x1="48" y1="32" x2="48" y2="208" stroke="rgba(255,255,255,0.12)" />
+      <line x1="48" y1="208" x2="592" y2="208" stroke="rgba(255,255,255,0.12)" />
       <path d={areaPath} fill="url(#usage-fill)" />
-      <path d={linePath} fill="none" stroke="#6fd2cf" strokeWidth="3.5" strokeLinecap="round" />
+      <path d={linePath} fill="none" stroke="#8fd3ff" strokeWidth="3.5" strokeLinecap="round" />
       {points.map((point) => (
         <g key={point.label}>
-          <circle cx={point.x} cy={point.y} r="4.5" fill="#f2b66d" />
-          <text x={point.x} y={point.y - 12} textAnchor="middle" fill="#f2efe7" fontSize="11">
+          <circle cx={point.x} cy={point.y} r="4.5" fill="#f0c488" />
+          <text x={point.x} y={point.y - 12} textAnchor="middle" fill="#f4f7fb" fontSize="11">
             {point.value.toFixed(0)}
           </text>
-          <text x={point.x} y="224" textAnchor="middle" fill="rgba(169,188,199,0.72)" fontSize="11">
+          <text x={point.x} y="224" textAnchor="middle" fill="rgba(196,207,219,0.72)" fontSize="11">
             {point.label}
           </text>
         </g>

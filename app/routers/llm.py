@@ -7,6 +7,7 @@ from app.models import GlobalLLMConfig, LLMConfig, UserProfile
 from app.schemas import (
     APIResponse,
     GlobalLLMConfigRead,
+    LLMConfigDiagnosticRequest,
     GlobalLLMConfigUpsertRequest,
     LLMConfigRead,
     LLMConfigTestRequest,
@@ -14,6 +15,9 @@ from app.schemas import (
 )
 from app.services.llm_registry import get_global_llm_config
 from app.services.llm_client import LLMRuntimeConfig, LLMServiceError, mask_api_key, test_openai_compatible_connection
+from src.llm.client import LLMClient as NationalStyleLLMClient
+from src.llm.client import LLMClientError as NationalStyleLLMClientError
+from src.llm.client import LLMConfig as NationalStyleLLMConfig
 
 
 router = APIRouter(prefix="/llm", tags=["llm"])
@@ -165,3 +169,60 @@ def test_llm(payload: LLMConfigTestRequest) -> APIResponse:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return APIResponse(data={"ok": True, "preview": preview[:200]})
+
+
+@router.post("/test/diagnostic", response_model=APIResponse)
+def diagnose_llm(payload: LLMConfigDiagnosticRequest) -> APIResponse:
+    client = NationalStyleLLMClient(
+        enabled=True,
+        config=NationalStyleLLMConfig(
+            api_key=payload.api_key,
+            base_url=payload.base_url,
+            model=payload.model_name,
+            provider=payload.provider,
+            timeout_seconds=90,
+        ),
+    )
+
+    history_context = (
+        "date,value\n"
+        "2024-07,8612.4\n"
+        "2024-08,8891.2\n"
+        "2024-09,8423.6\n"
+        "2024-10,8210.5\n"
+        "2024-11,7984.1\n"
+        "2024-12,8345.7\n"
+    )
+    forecast_context = (
+        "date,forecast,lower_bound,upper_bound\n"
+        "2025-01,8482.6,8260.1,8704.9\n"
+        "2025-02,8315.4,8088.0,8549.1\n"
+        "2025-03,8528.8,8294.7,8761.2\n"
+        "2025-04,8740.2,8505.1,8976.8\n"
+    )
+
+    try:
+        preview = client.answer_question(
+            question=payload.prompt,
+            history_context=history_context,
+            forecast_context=forecast_context,
+            rule_based_answer=None,
+            answer_mode="cloud_direct",
+        )
+    except NationalStyleLLMClientError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if client.last_answer_error:
+        raise HTTPException(status_code=400, detail=client.last_answer_error)
+
+    if not client.last_answer_used_cloud:
+        raise HTTPException(status_code=400, detail="诊断请求未触发云端回答，请检查当前模型是否可用。")
+
+    return APIResponse(
+        data={
+            "ok": True,
+            "preview": preview[:400],
+            "mode": "cloud_direct",
+            "timeout_seconds": client.config.timeout_seconds,
+        }
+    )

@@ -21,7 +21,7 @@ export default function Panel({
           {sideContent ? <div className="module-header-side">{sideContent}</div> : null}
         </div>
       )}
-      {children}
+      <div className="panel-body">{children}</div>
     </section>
   );
 }

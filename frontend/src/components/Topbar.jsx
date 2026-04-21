@@ -16,7 +16,7 @@ export default function Topbar({
 
   return (
     <header className="topbar">
-      <div>
+      <div className="topbar-main">
         <p className="eyebrow">当前模块</p>
         <h2 className="topbar-title">{title}</h2>
         <p className="topbar-copy">{note}</p>

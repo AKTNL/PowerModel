@@ -1,12 +1,4 @@
-export const NATIONAL_VIEW_KEYS = ["nationalOverview", "nationalReport", "nationalSources", "nationalModel"];
-
-export const DEFAULT_NATIONAL_LLM_FORM = {
-  enabled: false,
-  provider: "OpenAI-Compatible",
-  base_url: "",
-  model: "",
-  api_key: ""
-};
+export const NATIONAL_VIEW_KEYS = ["nationalOverview", "nationalReport", "nationalSources"];
 
 export const EMPTY_NATIONAL_RUN = {
   history: [],
@@ -18,6 +10,14 @@ export const EMPTY_NATIONAL_RUN = {
   raw_records: [],
   source_label: ""
 };
+
+function getSharedLlmLabel(savedLlmConfig) {
+  if (!savedLlmConfig?.enabled) {
+    return "未配置";
+  }
+
+  return savedLlmConfig.model_name || savedLlmConfig.model || "未配置";
+}
 
 export function isNationalView(view) {
   return NATIONAL_VIEW_KEYS.includes(view);
@@ -58,7 +58,7 @@ export function buildNationalSidebarCards({ runResult, savedLlmConfig, defaultDa
   const summary = defaultDataset?.summary;
   return [
     { label: "国家模块", value: runResult.stats ? "已运行" : "待预测" },
-    { label: "模型状态", value: savedLlmConfig?.enabled ? savedLlmConfig.model : "未配置" },
+    { label: "模型状态", value: getSharedLlmLabel(savedLlmConfig) },
     { label: "数据来源", value: runResult.source_label || uploadState.filename || summary?.history_end || "默认数据" }
   ];
 }
@@ -66,7 +66,7 @@ export function buildNationalSidebarCards({ runResult, savedLlmConfig, defaultDa
 export function buildNationalTopbarMeta({ savedLlmConfig, datasetSource }) {
   return [
     { label: "Module", value: "National" },
-    { label: "LLM", value: savedLlmConfig?.enabled ? savedLlmConfig.model : "未配置" },
+    { label: "LLM", value: getSharedLlmLabel(savedLlmConfig) },
     { label: "Dataset", value: datasetSource === "uploaded" ? "上传 CSV" : "官方数据" }
   ];
 }

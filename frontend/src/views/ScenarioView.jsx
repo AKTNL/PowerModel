@@ -11,7 +11,7 @@ export default function ScenarioView({
     <div className="module-view is-active" data-view="scenario">
       <div className="page-grid">
         <Panel
-          kicker="Scenario"
+          kicker="情景评估"
           title="情景模拟"
           note="基于最近一次预测结果，模拟减少空调或热水器使用时长后的节电效果，帮助用户判断调整习惯是否值得。"
         >
@@ -67,7 +67,7 @@ export default function ScenarioView({
         <div className="page-side-stack">
           <section className="side-panel">
             <div className="side-panel-head">
-              <p className="panel-kicker">Baseline</p>
+              <p className="panel-kicker">模拟基线</p>
               <h3>模拟状态</h3>
             </div>
             <div className="status-tile-grid">
@@ -86,7 +86,7 @@ export default function ScenarioView({
 
           <section className="side-panel">
             <div className="side-panel-head">
-              <p className="panel-kicker">Assumption</p>
+              <p className="panel-kicker">结果说明</p>
               <h3>结果说明</h3>
             </div>
             <div className="info-list">
