@@ -1,5 +1,31 @@
 import Panel from "../components/Panel.jsx";
 
+function normalizeWheelDelta(event) {
+  if (event.deltaMode === 1) {
+    return event.deltaY * 16;
+  }
+
+  if (event.deltaMode === 2) {
+    return event.deltaY * window.innerHeight;
+  }
+
+  return event.deltaY;
+}
+
+function forwardVerticalWheel(event) {
+  if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+    return;
+  }
+
+  const scrollTarget = event.currentTarget.closest(".content-shell") || document.scrollingElement;
+  if (!scrollTarget) {
+    return;
+  }
+
+  event.preventDefault();
+  scrollTarget.scrollBy({ top: normalizeWheelDelta(event), left: 0, behavior: "auto" });
+}
+
 function buildCleanRows(defaultDataset, runResult) {
   if (runResult.history?.length) {
     return runResult.history.map((item) => ({
@@ -36,7 +62,7 @@ function renderTable(rows, title) {
         <h3>{title}</h3>
         <span className="status-label">{rows.length} 行</span>
       </div>
-      <div className="table-shell national-source-table-shell">
+      <div className="table-shell national-source-table-shell" onWheel={forwardVerticalWheel}>
         <table className="usage-table national-source-table">
           <thead>
             <tr>
