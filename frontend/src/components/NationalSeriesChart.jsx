@@ -12,6 +12,31 @@ function formatNumber(value) {
   });
 }
 
+const VISIBLE_SERIES_COLORS = ["#0f62fe", "#007d79", "#8a3ffc", "#d58000", "#da1e28", "#198038"];
+
+function getRelativeLuminance(hexColor) {
+  if (!/^#[0-9a-f]{6}$/i.test(hexColor || "")) {
+    return null;
+  }
+
+  const channels = [1, 3, 5].map((start) => {
+    const value = Number.parseInt(hexColor.slice(start, start + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+function getVisibleSeriesColor(color, index) {
+  const fallback = VISIBLE_SERIES_COLORS[index % VISIBLE_SERIES_COLORS.length];
+  if (!color) {
+    return fallback;
+  }
+
+  const luminance = getRelativeLuminance(color);
+  return luminance !== null && luminance > 0.68 ? fallback : color;
+}
+
 function buildChartModel(series, width, height, padding) {
   const labelSet = new Set();
   const labels = [];
@@ -72,7 +97,7 @@ function buildChartModel(series, width, height, padding) {
     }))
     .filter((item) => item.visible);
 
-  const geometries = series.map((item) => {
+  const geometries = series.map((item, seriesIndex) => {
     const points = item.y.map((value, index) => {
       const label = String(item.x[index]);
       return {
@@ -91,6 +116,7 @@ function buildChartModel(series, width, height, padding) {
 
     return {
       ...item,
+      color: getVisibleSeriesColor(item.color, seriesIndex),
       points,
       linePath,
       areaPath,
@@ -153,7 +179,7 @@ export default function NationalSeriesChart({ title, caption, series = [] }) {
       <p className="national-chart-caption">{caption}</p>
       <div className="national-chart-shell">
         <svg viewBox={`0 0 ${width} ${height}`} className="national-chart" role="img" aria-label={title}>
-          <rect x="0" y="0" width={width} height={height} rx="20" fill="rgba(255,255,255,0.015)" />
+          <rect className="national-chart-bg" x="0" y="0" width={width} height={height} rx="20" />
           {yTicks.map((tick) => (
             <g key={`y-${tick.y.toFixed(2)}`}>
               <line

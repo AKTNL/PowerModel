@@ -3,7 +3,7 @@ import { NAV_ITEMS } from "../lib/powerUtils.js";
 function IconBase({ children }) {
   return (
     <svg
-      className="sidebar-icon-svg"
+      className="top-nav-icon-svg"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -100,97 +100,51 @@ const NAV_ICONS = {
 };
 
 function getNavIcon(item) {
-  return NAV_ICONS[item.key] || <span className="sidebar-icon-fallback">{item.icon}</span>;
+  return NAV_ICONS[item.key] || <span className="top-nav-icon-fallback">{item.icon}</span>;
 }
 
 export default function Sidebar({
   currentView,
-  currentUsername,
-  llmConfig,
-  usageCount,
-  latestPrediction,
-  statusCards,
   onNavigate,
-  isCollapsed,
-  onToggleCollapse
+  compactProgress = 0
 }) {
-  const cards =
-    statusCards ||
-    [
-      { label: "当前用户", value: currentUsername || "尚未创建" },
-      { label: "模型状态", value: llmConfig?.enabled ? llmConfig.model_name : "未配置" },
-      { label: "数据与预测", value: `${usageCount} 条记录 / ${latestPrediction?.target_month || "--"}` }
-    ];
+  const progress = Math.min(Math.max(compactProgress, 0), 1);
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-bar">
-          <div className="sidebar-brand-lockup">
-            <span className="sidebar-brand-mark" aria-hidden="true">
-              <span />
-            </span>
-            <div className="sidebar-brand-text">
-              <p className="eyebrow">Energy Console</p>
-              <h1>家庭 + 国家用电预测平台</h1>
-            </div>
+    <header className="top-nav" style={{ "--nav-progress": progress }}>
+      <div className="top-nav-brand">
+        <div className="top-nav-brand-lockup">
+          <span className="top-nav-brand-mark" aria-hidden="true">
+            <span />
+          </span>
+          <div className="top-nav-brand-text">
+            <p className="eyebrow">Energy Console</p>
+            <h1>家庭 + 国家用电预测平台</h1>
           </div>
-          <button
-            type="button"
-            className="sidebar-collapse-button"
-            onClick={onToggleCollapse}
-            aria-label={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
-            aria-pressed={isCollapsed}
-            title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
-          >
-            <span className={`sidebar-collapse-icon ${isCollapsed ? "is-collapsed" : ""}`.trim()} aria-hidden="true" />
-          </button>
         </div>
-        <p className="sidebar-copy">
-          以统一的信息架构承载家庭预测与国家级趋势分析，让数据录入、预测决策和智能问答保持连续体验。
-        </p>
       </div>
 
-      <div className="sidebar-section-title">运行概览</div>
-      <div className="sidebar-status">
-        {cards.map((item) => (
-          <div className="status-card" key={item.label}>
-            <span className="status-label">{item.label}</span>
-            <strong>{item.value}</strong>
-          </div>
-        ))}
-      </div>
-
-      <div className="sidebar-section-title">功能导航</div>
-      <nav className="sidebar-nav">
+      <nav className="top-nav-links" aria-label="功能导航">
         {NAV_ITEMS.map((item) => {
           const active = item.key === currentView;
           return (
             <button
               key={item.key}
               type="button"
-              className={`sidebar-link ${active ? "is-active" : ""}`.trim()}
+              className={`top-nav-link ${active ? "is-active" : ""}`.trim()}
               onClick={() => onNavigate(item.key)}
               aria-label={item.title}
               aria-current={active ? "page" : undefined}
-              data-tooltip={item.title}
             >
-              <span className="sidebar-link-active-bar" aria-hidden="true" />
-              <span className="sidebar-link-icon">{getNavIcon(item)}</span>
-              <span className="sidebar-link-main">
-                <span className="sidebar-link-title">{item.title}</span>
-                <span className="sidebar-link-note">{item.note}</span>
+              <span className="top-nav-link-icon">{getNavIcon(item)}</span>
+              <span className="top-nav-link-main">
+                <span className="top-nav-link-title">{item.title}</span>
+                <span className="top-nav-link-note">{item.note}</span>
               </span>
             </button>
           );
         })}
       </nav>
-
-      <div className="sidebar-footer">
-        <p className="subtle-note">
-          当前界面已统一家庭与国家模块的框架、滚动逻辑和模型接入方式，便于演示与后续扩展。
-        </p>
-      </div>
-    </aside>
+    </header>
   );
 }
