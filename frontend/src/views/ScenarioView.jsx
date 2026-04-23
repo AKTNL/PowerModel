@@ -164,26 +164,6 @@ export default function ScenarioView({
             </div>
           </section>
 
-          <section className="side-panel">
-            <div className="side-panel-head">
-              <p className="panel-kicker">使用建议</p>
-              <h3>怎么讲这页</h3>
-            </div>
-            <div className="info-list">
-              <div className="info-list-item">
-                <strong>这不是单独的拍脑袋估算</strong>
-                <p>它基于最近一次预测结果做反事实调整，和预测页使用同一套业务口径。</p>
-              </div>
-              <div className="info-list-item">
-                <strong>最适合展示可控项收益</strong>
-                <p>答辩时可以直接说明“如果用户改变习惯，系统能量化估计会减少多少用电和电费”。</p>
-              </div>
-              <div className="info-list-item">
-                <strong>先预测，再模拟</strong>
-                <p>没有基线预测时，情景模拟的参考意义会明显下降。</p>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
     </div>
