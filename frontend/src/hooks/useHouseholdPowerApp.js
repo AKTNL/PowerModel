@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from "react";
+﻿import { startTransition, useEffect, useRef, useState } from "react";
 
 import {
   DEFAULT_LLM_PREVIEW,
@@ -19,7 +19,6 @@ import {
   demoUsageRecords,
   downloadCsvTemplate,
   ensureDraftRows,
-  formatNumber,
   getRenderableRecords,
   normalizeNumber,
   normalizeValue,
@@ -89,6 +88,10 @@ export function useHouseholdPowerApp() {
   const [latestPrediction, setLatestPrediction] = useState(null);
   const [latestPredictionMeta, setLatestPredictionMeta] = useState(null);
   const [targetMonth, setTargetMonth] = useState("");
+  const [predictionContextForm, setPredictionContextForm] = useState({
+    avg_temperature: "",
+    holiday_count: ""
+  });
   const [llmPreview, setLlmPreview] = useState(DEFAULT_LLM_PREVIEW);
   const [isTestingLlm, setIsTestingLlm] = useState(false);
   const [isDiagnosingLlm, setIsDiagnosingLlm] = useState(false);
@@ -156,6 +159,10 @@ export function useHouseholdPowerApp() {
     setScenarioForm(DEFAULT_SCENARIO_FORM);
     setScenarioResult(DEFAULT_SCENARIO_RESULT);
     setTargetMonth("");
+    setPredictionContextForm({
+      avg_temperature: "",
+      holiday_count: ""
+    });
   }
 
   function applyLoadedUser(user) {
@@ -167,6 +174,14 @@ export function useHouseholdPowerApp() {
       air_conditioner_count: toInputValue(user.air_conditioner_count),
       water_heater_type: user.water_heater_type || "",
       cooking_type: user.cooking_type || ""
+    });
+  }
+
+  function applyPredictionContextFromPrediction(prediction) {
+    const context = prediction?.context || {};
+    setPredictionContextForm({
+      avg_temperature: toInputValue(context.avg_temperature),
+      holiday_count: toInputValue(context.holiday_count)
     });
   }
 
@@ -314,11 +329,16 @@ export function useHouseholdPowerApp() {
         if (!cancelled) {
           setLatestPrediction(predictionResponse.data.prediction);
           setLatestPredictionMeta({ generation_mode: "saved", llm_error: null });
+          applyPredictionContextFromPrediction(predictionResponse.data.prediction);
         }
       } catch {
         if (!cancelled) {
           setLatestPrediction(null);
           setLatestPredictionMeta(null);
+          setPredictionContextForm({
+            avg_temperature: "",
+            holiday_count: ""
+          });
         }
       }
 
@@ -373,6 +393,11 @@ export function useHouseholdPowerApp() {
   function handleScenarioChange(event) {
     const { name, value } = event.target;
     setScenarioForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function handlePredictionContextChange(event) {
+    const { name, value } = event.target;
+    setPredictionContextForm((current) => ({ ...current, [name]: value }));
   }
 
   function handleUsageChange(index, field, value) {
@@ -613,9 +638,20 @@ export function useHouseholdPowerApp() {
 
   async function handleRunPrediction() {
     const numericUserId = requireUserId();
+    const avgTemperature = normalizeNumber(predictionContextForm.avg_temperature);
+    const holidayCount = normalizeNumber(predictionContextForm.holiday_count);
+    const contextPayload = {};
+
+    if (avgTemperature !== null) {
+      contextPayload.avg_temperature = avgTemperature;
+    }
+    if (holidayCount !== null) {
+      contextPayload.holiday_count = holidayCount;
+    }
     const response = await runMonthlyPrediction({
       user_id: numericUserId,
-      target_month: targetMonth || null
+      target_month: targetMonth || null,
+      context: Object.keys(contextPayload).length ? contextPayload : null
     });
 
     setLatestPrediction(response.data.prediction);
@@ -623,6 +659,7 @@ export function useHouseholdPowerApp() {
       generation_mode: response.data.generation_mode,
       llm_error: response.data.llm_error
     });
+    applyPredictionContextFromPrediction(response.data.prediction);
     navigate("prediction");
     showToast(`已生成 ${response.data.prediction.target_month} 的预测结果`);
   }
@@ -632,6 +669,7 @@ export function useHouseholdPowerApp() {
     const response = await fetchLatestPrediction(numericUserId);
     setLatestPrediction(response.data.prediction);
     setLatestPredictionMeta({ generation_mode: "saved", llm_error: null });
+    applyPredictionContextFromPrediction(response.data.prediction);
     showToast("已刷新最近一次预测结果");
   }
 
@@ -666,17 +704,15 @@ export function useHouseholdPowerApp() {
     const response = await simulateScenario({
       user_id: numericUserId,
       reduce_ac_hours_per_day: normalizeNumber(scenarioForm.reduce_ac_hours_per_day) ?? 0,
-      reduce_water_heater_hours_per_day: normalizeNumber(scenarioForm.reduce_water_heater_hours_per_day) ?? 0
+      ac_setpoint_delta_c: normalizeNumber(scenarioForm.ac_setpoint_delta_c) ?? 0,
+      water_heater_mode: scenarioForm.water_heater_mode || "keep",
+      away_days: normalizeNumber(scenarioForm.away_days) ?? 0
     });
 
-    const data = response.data;
     setScenarioResult({
       empty: false,
-      text:
-        `基线用电量：${formatNumber(data.baseline_kwh, 2)} kWh\n` +
-        `模拟后用电量：${formatNumber(data.simulated_kwh, 2)} kWh\n` +
-        `预计节省电量：${formatNumber(data.saved_kwh, 2)} kWh\n` +
-        `模拟后电费：${formatNumber(data.simulated_bill, 2)} 元\n\n${data.summary}`
+      ...response.data,
+      scenario_contributions: response.data.scenario_contributions || []
     });
   }
 
@@ -810,6 +846,8 @@ export function useHouseholdPowerApp() {
       prediction: {
         targetMonth,
         onTargetMonthChange: (event) => setTargetMonth(event.target.value),
+        predictionContextForm,
+        onPredictionContextChange: handlePredictionContextChange,
         onRunPrediction: () => runSafely(handleRunPrediction),
         onRefreshPrediction: () => runSafely(handleRefreshPrediction),
         onRegenerateAdvice: () => runSafely(handleRegenerateAdvice),

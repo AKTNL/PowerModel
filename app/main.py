@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import Base, engine
+from app.database import Base, engine, ensure_runtime_schema
 from app.routers import advice, chat, llm, predict, usage, users
 from app.routers.national import router as national_router
 from app.services.national import NationalServiceError
@@ -26,6 +26,7 @@ FRONTEND_ASSETS_DIR = FRONTEND_DIST_DIR / "assets"
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema()
     yield
 
 

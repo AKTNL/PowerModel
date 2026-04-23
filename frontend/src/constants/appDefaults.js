@@ -25,7 +25,9 @@ export const DEFAULT_MODEL_FORM = {
 
 export const DEFAULT_SCENARIO_FORM = {
   reduce_ac_hours_per_day: "",
-  reduce_water_heater_hours_per_day: ""
+  ac_setpoint_delta_c: "",
+  water_heater_mode: "keep",
+  away_days: ""
 };
 
 export const DEFAULT_LLM_PREVIEW = {
@@ -35,5 +37,12 @@ export const DEFAULT_LLM_PREVIEW = {
 
 export const DEFAULT_SCENARIO_RESULT = {
   empty: true,
-  text: "运行模拟后会在这里显示节电效果。"
+  summary: "运行模拟后会在这里显示节电效果。",
+  baseline_kwh: 0,
+  baseline_bill: 0,
+  simulated_kwh: 0,
+  simulated_bill: 0,
+  saved_kwh: 0,
+  saved_bill: 0,
+  scenario_contributions: []
 };

@@ -36,11 +36,37 @@ def _format_profile(user: UserProfile) -> str:
     )
 
 
+def _format_contributions(prediction: PredictionRecord) -> str:
+    if not prediction.contributions:
+        return "no_structured_contributions"
+
+    lines: list[str] = []
+    for item in prediction.contributions:
+        kwh = float(item.get("kwh", 0))
+        share_percent = item.get("share_percent")
+        share_text = f", share={share_percent}%" if share_percent is not None else ""
+        lines.append(
+            f"- {item.get('label', item.get('key', 'item'))}: {kwh:+.1f} kWh"
+            f", type={item.get('type', 'unknown')}{share_text}, summary={item.get('summary', '')}"
+        )
+    return "\n".join(lines)
+
+
+def _format_assumptions(prediction: PredictionRecord) -> str:
+    if not prediction.assumptions:
+        return "no_assumptions"
+    return "\n".join(f"- {item}" for item in prediction.assumptions)
+
+
 def _format_prediction(prediction: PredictionRecord) -> str:
+    context = prediction.context
     return (
         f"target_month={prediction.target_month}, predicted_kwh={prediction.predicted_kwh}, "
         f"predicted_bill={prediction.predicted_bill}, lower_bound={prediction.lower_bound}, "
-        f"upper_bound={prediction.upper_bound}, reason_text={prediction.reason_text}"
+        f"upper_bound={prediction.upper_bound}, baseline_kwh={prediction.baseline_kwh}, "
+        f"context={context}\n"
+        f"contributions:\n{_format_contributions(prediction)}\n"
+        f"assumptions:\n{_format_assumptions(prediction)}"
     )
 
 
@@ -91,11 +117,54 @@ def _recent_usage_summary(usages: list[MonthlyUsage]) -> tuple[str, float | None
     return summary, average_three
 
 
+def _build_rule_reason(prediction: PredictionRecord) -> str:
+    if not prediction.contributions:
+        return prediction.reason_text or "当前暂无详细原因分析。"
+
+    base_items = [item for item in prediction.contributions if item.get("type") == "base"]
+    adjustment_items = [
+        item for item in prediction.contributions
+        if item.get("type") == "adjustment" and abs(float(item.get("kwh", 0))) >= 0.01
+    ]
+
+    parts: list[str] = []
+    if prediction.baseline_kwh is not None and base_items:
+        base_text = "、".join(
+            f"{item.get('label', '贡献项')}{float(item.get('kwh', 0)):+.1f} kWh"
+            for item in base_items[:3]
+        )
+        parts.append(f"历史基线约 {prediction.baseline_kwh:.1f} kWh，主要由 {base_text} 构成。")
+
+    if adjustment_items:
+        adjustment_text = "、".join(
+            f"{item.get('label', '修正项')}{float(item.get('kwh', 0)):+.1f} kWh"
+            for item in adjustment_items[:3]
+        )
+        parts.append(f"在基线之上，{adjustment_text} 共同把预测推到 {prediction.predicted_kwh:.1f} kWh。")
+    elif prediction.baseline_kwh is not None:
+        delta = prediction.predicted_kwh - prediction.baseline_kwh
+        parts.append(f"本次额外修正较小，最终预测值约为 {prediction.predicted_kwh:.1f} kWh，较历史基线变动 {delta:+.1f} kWh。")
+
+    if prediction.assumptions:
+        parts.append(f"当前预测假设：{prediction.assumptions[0]}")
+
+    return "".join(parts) or prediction.reason_text or "当前暂无详细原因分析。"
+
+
 def generate_rule_advice(user: UserProfile, prediction: PredictionRecord) -> str:
     advice: list[str] = []
+    contribution_map = {
+        str(item.get("key")): float(item.get("kwh", 0))
+        for item in prediction.contributions
+        if item.get("key") is not None
+    }
 
-    if user.air_conditioner_count and user.air_conditioner_count > 0:
-        advice.append("空调设定温度尽量保持在 26C 左右，并配合风扇使用，可降低夏季高峰负荷。")
+    if contribution_map.get("air_conditioner_adjustment", 0) > 0:
+        advice.append("本次结果里空调相关修正为正，建议优先优化空调时长、设定温度和夜间待机。")
+
+    baseline_load = contribution_map.get("recent_month_weighted", 0) + contribution_map.get("recent_average_weighted", 0)
+    if prediction.predicted_kwh and baseline_load / prediction.predicted_kwh >= 0.6:
+        advice.append("近期高基线是主要来源，建议先排查长期运行设备、待机负荷和固定时段高耗电习惯。")
 
     if user.water_heater_type and "电" in user.water_heater_type:
         advice.append("电热水器尽量采用定时加热，避免全天保温待机。")
@@ -118,7 +187,7 @@ def generate_prediction_insights(
     prediction: PredictionRecord,
     llm_config: LLMConfig | None,
 ) -> InsightResult:
-    fallback_reason = prediction.reason_text or "当前暂无详细原因分析。"
+    fallback_reason = _build_rule_reason(prediction)
     fallback_advice = generate_rule_advice(user, prediction)
 
     if not llm_config or not llm_config.enabled:
@@ -133,9 +202,9 @@ def generate_prediction_insights(
             "role": "system",
             "content": (
                 "你是家庭用电分析助手。"
-                "请根据提供的家庭画像和预测结果，生成简明、具体、可执行的中文分析。"
-                "必须严格使用以下格式返回："
-                "[reason]...[/reason][advice]1. ...[/advice]"
+                "你会收到结构化预测结果、贡献拆解和预测假设。"
+                "必须只基于提供的数据解释，不得编造新的 kWh 数字、贡献项或结论。"
+                "必须严格使用以下格式返回：[reason]...[/reason][advice]1. ...[/advice]"
             ),
         },
         {
@@ -146,7 +215,7 @@ def generate_prediction_insights(
                 "预测结果："
                 f"{_format_prediction(prediction)}\n"
                 "请输出：\n"
-                "1. 2 到 3 句原因分析，解释为什么下个月电量会变化。\n"
+                "1. 2 到 3 句原因分析，优先引用贡献项解释为什么下个月用电会变化。\n"
                 "2. 3 条节电建议，每条都要可执行，不要空话。"
             ),
         },
@@ -190,7 +259,7 @@ def answer_question_with_rules(
         baseline = "当前还没有预测结果，建议先执行一次月度预测。"
 
     if any(keyword in question_text for keyword in ["为什么", "原因", "上涨", "增加", "变高"]):
-        reason = prediction.reason_text if prediction and prediction.reason_text else "当前原因分析还不完整。"
+        reason = _build_rule_reason(prediction) if prediction else "当前原因分析还不完整。"
         return f"{baseline}\n{usage_summary}\n主要原因：{reason}"
 
     if any(keyword in question_text for keyword in ["电费", "费用", "多少钱"]):
@@ -258,9 +327,10 @@ def answer_question(
             "role": "system",
             "content": (
                 "你是家庭用电智能问答助手。"
-                "请基于已有预测结果、历史用电记录和家庭画像回答问题。"
+                "请基于已有预测结果、结构化贡献拆解、历史用电记录和家庭画像回答问题。"
                 "回答要简洁、具体，优先给出可执行建议。"
                 "如果信息不足，要明确指出还缺什么。"
+                "不得编造新的贡献数字。"
             ),
         },
         {
@@ -291,23 +361,141 @@ def answer_question(
     return answer, "llm", None
 
 
+def _scenario_temperature(prediction: PredictionRecord) -> float:
+    context = prediction.context
+    if context.get("avg_temperature") is not None:
+        return float(context["avg_temperature"])
+    if context.get("reference_avg_temperature") is not None:
+        return float(context["reference_avg_temperature"])
+
+    target_month = prediction.target_month or ""
+    try:
+        month = int(target_month.split("-")[1])
+    except (IndexError, ValueError):
+        month = 7
+
+    if month in {6, 7, 8, 9}:
+        return 30.0
+    if month in {12, 1, 2}:
+        return 10.0
+    return 22.0
+
+
+def _scenario_contribution(label: str, kwh: float, summary: str) -> dict[str, float | str]:
+    rounded = round(kwh, 2)
+    return {
+        "label": label,
+        "kwh": rounded,
+        "direction": "increase" if rounded >= 0 else "decrease",
+        "summary": summary,
+    }
+
+
 def simulate_scenario(
+    *,
+    user: UserProfile,
     prediction: PredictionRecord,
     reduce_ac_hours_per_day: float,
+    ac_setpoint_delta_c: float,
     reduce_water_heater_hours_per_day: float,
-) -> dict[str, float | str]:
-    ac_saving = reduce_ac_hours_per_day * 4.5
-    water_heater_saving = reduce_water_heater_hours_per_day * 2.5
-    total_saving = round(ac_saving + water_heater_saving, 2)
-    simulated_kwh = round(max(0, prediction.predicted_kwh - total_saving), 2)
-    price_per_kwh = (prediction.predicted_bill / prediction.predicted_kwh) if prediction.predicted_kwh else 0
+    away_days: int,
+    water_heater_mode: str,
+) -> dict[str, float | str | list[dict[str, float | str]]]:
+    baseline_kwh = float(prediction.predicted_kwh)
+    baseline_bill = float(prediction.predicted_bill or 0)
+    price_per_kwh = (baseline_bill / baseline_kwh) if baseline_kwh else 0
+    family_size = user.family_size or 3
+    ac_count = user.air_conditioner_count or 0
+    scenario_temperature = _scenario_temperature(prediction)
+
+    contributions: list[dict[str, float | str]] = []
+
+    if reduce_ac_hours_per_day > 0 and ac_count > 0:
+        cooling_pressure = max(scenario_temperature - 26, 0)
+        per_hour_per_ac = 0.9 + (0.25 * cooling_pressure)
+        ac_runtime_delta = round(-(reduce_ac_hours_per_day * ac_count * per_hour_per_ac), 2)
+        contributions.append(
+            _scenario_contribution(
+                "空调时长调整",
+                ac_runtime_delta,
+                f"按 {ac_count} 台空调、目标温度 {scenario_temperature:.1f}°C 估算，每天少开 {reduce_ac_hours_per_day:.1f} 小时。",
+            )
+        )
+
+    if ac_setpoint_delta_c > 0 and ac_count > 0:
+        cooling_pressure = max(scenario_temperature - 26, 0)
+        per_degree_per_ac = 1.1 + (0.2 * cooling_pressure)
+        ac_setpoint_delta = round(-(ac_setpoint_delta_c * ac_count * per_degree_per_ac), 2)
+        contributions.append(
+            _scenario_contribution(
+                "空调设定温度调整",
+                ac_setpoint_delta,
+                f"假设空调设定温度上调 {ac_setpoint_delta_c:.1f}°C，在当前气温下可抵消一部分温敏负荷。",
+            )
+        )
+
+    heater_type = user.water_heater_type or ""
+    has_electric_heater = "电" in heater_type
+    if has_electric_heater:
+        heater_mode_saving_map = {
+            "keep": 0.0,
+            "timer": round(-(3.0 + family_size * 0.9), 2),
+            "eco": round(-(5.0 + family_size * 1.2), 2),
+        }
+        heater_mode_delta = heater_mode_saving_map.get(water_heater_mode, 0.0)
+        if heater_mode_delta != 0:
+            contributions.append(
+                _scenario_contribution(
+                    "热水器模式切换",
+                    heater_mode_delta,
+                    f"把热水器模式切到 {water_heater_mode}，估算可减少保温和待机损耗。",
+                )
+            )
+
+        if reduce_water_heater_hours_per_day > 0:
+            heater_runtime_delta = round(-(reduce_water_heater_hours_per_day * 2.5), 2)
+            contributions.append(
+                _scenario_contribution(
+                    "热水器时长调整",
+                    heater_runtime_delta,
+                    f"每天减少热水器使用 {reduce_water_heater_hours_per_day:.1f} 小时。",
+                )
+            )
+
+    if away_days > 0:
+        daily_load = baseline_kwh / 30 if baseline_kwh else 0
+        away_factor = min(0.24 + (family_size * 0.04), 0.45)
+        away_delta = round(-(away_days * daily_load * away_factor), 2)
+        contributions.append(
+            _scenario_contribution(
+                "外出天数影响",
+                away_delta,
+                f"假设目标月外出 {away_days} 天，减少部分居家设备和舒适性负荷。",
+            )
+        )
+
+    total_delta = round(sum(float(item["kwh"]) for item in contributions), 2)
+    simulated_kwh = round(max(0, baseline_kwh + total_delta), 2)
     simulated_bill = round(simulated_kwh * price_per_kwh, 2)
+    saved_kwh = round(max(0, baseline_kwh - simulated_kwh), 2)
+    saved_bill = round(max(0, baseline_bill - simulated_bill), 2)
+
+    if contributions:
+        top_items = "、".join(f"{item['label']}{float(item['kwh']):+.1f} kWh" for item in contributions[:3])
+        summary = (
+            f"本次情景模拟基于 {prediction.target_month} 的已保存预测结果做反事实调整，"
+            f"默认保持天气和节假日预测不变，只改变可控行为参数。主要变化来自：{top_items}。"
+        )
+    else:
+        summary = "当前没有输入任何有效的情景调整参数，因此模拟结果与基线预测保持一致。"
 
     return {
-        "baseline_kwh": prediction.predicted_kwh,
-        "baseline_bill": prediction.predicted_bill,
+        "baseline_kwh": round(baseline_kwh, 2),
+        "baseline_bill": round(baseline_bill, 2),
         "simulated_kwh": simulated_kwh,
         "simulated_bill": simulated_bill,
-        "saved_kwh": total_saving,
-        "summary": "当前情景模拟采用规则估算，适合演示交互流程，后续可替换成更细的设备级模型。",
+        "saved_kwh": saved_kwh,
+        "saved_bill": saved_bill,
+        "scenario_contributions": contributions,
+        "summary": summary,
     }

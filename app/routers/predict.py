@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,7 +9,7 @@ from app.models import PredictionRecord, UserProfile
 from app.schemas import APIResponse, PredictionRead, PredictionRequest
 from app.services.advisor import generate_prediction_insights
 from app.services.llm_registry import resolve_effective_llm_config
-from app.services.predictor import predict_usage
+from app.services.predictor import PredictionContextInput, predict_usage
 
 
 router = APIRouter(prefix="/predict", tags=["predict"])
@@ -20,7 +22,15 @@ def predict_monthly(payload: PredictionRequest, db: Session = Depends(get_db)) -
         raise HTTPException(status_code=404, detail="User not found")
 
     try:
-        result = predict_usage(db=db, user=user, target_month=payload.target_month)
+        result = predict_usage(
+            db=db,
+            user=user,
+            target_month=payload.target_month,
+            context=PredictionContextInput(
+                avg_temperature=payload.context.avg_temperature if payload.context else None,
+                holiday_count=payload.context.holiday_count if payload.context else None,
+            ),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -31,6 +41,10 @@ def predict_monthly(payload: PredictionRequest, db: Session = Depends(get_db)) -
         predicted_bill=result.predicted_bill,
         lower_bound=result.lower_bound,
         upper_bound=result.upper_bound,
+        baseline_kwh=result.baseline_kwh,
+        context_json=json.dumps(result.context, ensure_ascii=False),
+        contribution_json=json.dumps(result.contributions, ensure_ascii=False),
+        assumption_json=json.dumps(result.assumptions, ensure_ascii=False),
         reason_text="\n".join(result.reasons),
     )
     db.add(prediction)

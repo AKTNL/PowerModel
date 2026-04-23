@@ -61,9 +61,24 @@ class MonthlyUsageRead(MonthlyUsageBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PredictionContextRequest(BaseModel):
+    avg_temperature: float | None = Field(default=None, ge=-50, le=70)
+    holiday_count: int | None = Field(default=None, ge=0, le=31)
+
+
+class PredictionContextRead(BaseModel):
+    avg_temperature: float | None = None
+    holiday_count: int | None = None
+    reference_avg_temperature: float | None = None
+    reference_holiday_count: float | None = None
+    temperature_source: str | None = None
+    holiday_source: str | None = None
+
+
 class PredictionRequest(BaseModel):
     user_id: int
     target_month: str | None = Field(default=None, description="Optional. Format: YYYY-MM")
+    context: PredictionContextRequest | None = None
 
     @field_validator("target_month")
     @classmethod
@@ -74,6 +89,16 @@ class PredictionRequest(BaseModel):
         return value
 
 
+class PredictionContributionRead(BaseModel):
+    key: str
+    label: str
+    kwh: float
+    share_percent: float | None = None
+    type: str
+    direction: str
+    summary: str
+
+
 class PredictionRead(BaseModel):
     id: int
     user_id: int
@@ -82,6 +107,10 @@ class PredictionRead(BaseModel):
     predicted_bill: float | None = None
     lower_bound: float | None = None
     upper_bound: float | None = None
+    baseline_kwh: float | None = None
+    context: PredictionContextRead = Field(default_factory=PredictionContextRead)
+    contributions: list[PredictionContributionRead] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
     reason_text: str | None = None
     advice_text: str | None = None
     created_at: datetime
@@ -184,7 +213,10 @@ class ChatRead(BaseModel):
 class ScenarioRequest(BaseModel):
     user_id: int
     reduce_ac_hours_per_day: float = Field(default=0, ge=0)
+    ac_setpoint_delta_c: float = Field(default=0, ge=0, le=8)
     reduce_water_heater_hours_per_day: float = Field(default=0, ge=0)
+    away_days: int = Field(default=0, ge=0, le=31)
+    water_heater_mode: str = Field(default="keep")
     target_month: str | None = Field(default=None, description="Optional. Format: YYYY-MM")
 
     @field_validator("target_month")
@@ -194,3 +226,11 @@ class ScenarioRequest(BaseModel):
             return value
         MonthlyUsageBase.validate_usage_month(value)
         return value
+
+    @field_validator("water_heater_mode")
+    @classmethod
+    def validate_water_heater_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"keep", "timer", "eco"}:
+            raise ValueError("water_heater_mode must be one of: keep, timer, eco")
+        return normalized

@@ -111,8 +111,12 @@ def scenario_simulate(payload: ScenarioRequest, db: Session = Depends(get_db)) -
         raise HTTPException(status_code=404, detail="Prediction not found")
 
     result = simulate_scenario(
+        user=user,
         prediction=prediction,
         reduce_ac_hours_per_day=payload.reduce_ac_hours_per_day,
+        ac_setpoint_delta_c=payload.ac_setpoint_delta_c,
         reduce_water_heater_hours_per_day=payload.reduce_water_heater_hours_per_day,
+        away_days=payload.away_days,
+        water_heater_mode=payload.water_heater_mode,
     )
     return APIResponse(data=result)

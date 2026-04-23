@@ -1,7 +1,7 @@
 from collections.abc import Generator
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -38,6 +38,32 @@ class Base(DeclarativeBase):
 
 engine = build_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+RUNTIME_SCHEMA_PATCHES = {
+    "prediction_record": {
+        "baseline_kwh": "ALTER TABLE prediction_record ADD COLUMN baseline_kwh FLOAT",
+        "contribution_json": "ALTER TABLE prediction_record ADD COLUMN contribution_json TEXT",
+        "assumption_json": "ALTER TABLE prediction_record ADD COLUMN assumption_json TEXT",
+        "context_json": "ALTER TABLE prediction_record ADD COLUMN context_json TEXT",
+    }
+}
+
+
+def ensure_runtime_schema() -> None:
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+
+    with engine.begin() as connection:
+        for table_name, column_patches in RUNTIME_SCHEMA_PATCHES.items():
+            if table_name not in existing_tables:
+                continue
+
+            existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, ddl in column_patches.items():
+                if column_name in existing_columns:
+                    continue
+                connection.execute(text(ddl))
 
 
 def get_db() -> Generator[Session, None, None]:

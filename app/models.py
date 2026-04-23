@@ -1,4 +1,6 @@
+import json
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -61,11 +63,49 @@ class PredictionRecord(Base):
     predicted_bill: Mapped[float | None] = mapped_column(Float, nullable=True)
     lower_bound: Mapped[float | None] = mapped_column(Float, nullable=True)
     upper_bound: Mapped[float | None] = mapped_column(Float, nullable=True)
+    baseline_kwh: Mapped[float | None] = mapped_column(Float, nullable=True)
+    contribution_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assumption_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     reason_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     advice_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["UserProfile"] = relationship(back_populates="predictions")
+
+    @staticmethod
+    def _decode_json_list(raw_value: str | None) -> list[Any]:
+        if not raw_value:
+            return []
+
+        try:
+            decoded = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return []
+
+        return decoded if isinstance(decoded, list) else []
+
+    @property
+    def contributions(self) -> list[dict[str, Any]]:
+        payload = self._decode_json_list(self.contribution_json)
+        return [item for item in payload if isinstance(item, dict)]
+
+    @property
+    def assumptions(self) -> list[str]:
+        payload = self._decode_json_list(self.assumption_json)
+        return [str(item) for item in payload]
+
+    @property
+    def context(self) -> dict[str, Any]:
+        if not self.context_json:
+            return {}
+
+        try:
+            decoded = json.loads(self.context_json)
+        except json.JSONDecodeError:
+            return {}
+
+        return decoded if isinstance(decoded, dict) else {}
 
 
 class LLMConfig(Base):
