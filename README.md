@@ -333,7 +333,6 @@ $env:DATABASE_URL = "postgresql://postgres:password@127.0.0.1:5432/household_pow
 $env:SOURCE_DATABASE_URL = "sqlite:///./household_power.db"
 ```
 
-## 推荐演示流程
 
 ### 家庭模块
 
